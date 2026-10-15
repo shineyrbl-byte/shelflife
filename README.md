@@ -13,7 +13,7 @@ npm run seed:history # optional: 4 weeks of past sales and waste, for the Insigh
 
 Optional: copy `.env.example` to `.env.local` and set:
 - `NEXT_PUBLIC_SHOP_NAME`: shown to customers.
-- `GEMINI_API_KEY`: a free key from [aistudio.google.com/apikey](https://aistudio.google.com/apikey) turns on **✨ Write with AI** for bundle names and descriptions.
+- `GEMINI_API_KEY`: a free key from [aistudio.google.com/apikey](https://aistudio.google.com/apikey) turns on **📷 Scan a bill** and **✨ Write with AI** for bundle names and descriptions.
 
 Everything else works without any keys or accounts, on local SQLite.
 
@@ -22,7 +22,7 @@ Everything else works without any keys or accounts, on local SQLite.
 | Page | Who | What |
 |---|---|---|
 | `/` Dashboard | Owner | Stock value at risk now, expired stock to log, the last 7/30 days (money rescued, waste at cost, rescue rate), and today's summary to send on WhatsApp |
-| `/stock` | Staff | Add deliveries and bakes with an expiry date; stock grouped by urgency; log units as sold or wasted |
+| `/stock` | Staff | Scan a supplier bill or add deliveries by hand, with expiry dates; stock grouped by urgency; log units as sold or wasted |
 | `/bundles` | Staff | Suggested rescue bundles to publish (price editable); live bundles with a *Sold 1* button for the till |
 | `/insights` | Owner | Ordering tips ("order 9 croissants, not 12"), waste by weekday, and where each item's stock goes |
 | `/deals` | Customers | Phone-friendly list of today's bundles, with a *Share on WhatsApp* button |
@@ -34,6 +34,10 @@ Everything else works without any keys or accounts, on local SQLite.
 3. Price it at 50% off if it expires today, 40% tomorrow, 30% in two days, rounded to ₹5. The price never goes below what the stock cost.
 4. How many bundles can be sold is computed live from remaining stock, and each sale is recorded in a transaction, so a bundle can never oversell.
 5. Optionally, **✨ Write with AI** (`src/lib/ai.ts`, Gemini free tier) gives the bundle an appetising name and description. AI only writes the words: contents and price stay rule-based, and it's told never to make food sound old or unsafe.
+
+### Bill scanning (`src/lib/ai.ts`)
+
+Staff photograph a supplier bill; Gemini returns each stock line as schema-checked JSON: a clean name, category, quantity converted to a sensible unit (2 trays of 30 eggs = 60 pcs), cost per unit, and a typical shelf life. Delivery charges and tax lines are skipped. Bills don't show selling prices or expiry dates, so the app suggests about twice cost and an estimated expiry, and **nothing is saved until staff review every line** in an editable table. The chosen lines are added in one transaction. Photos are shrunk in the browser before upload.
 
 ### Ordering tips (`src/lib/insights.ts`)
 

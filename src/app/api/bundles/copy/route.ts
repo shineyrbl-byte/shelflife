@@ -1,6 +1,5 @@
-import { ApiError } from "@google/genai";
 import { z } from "zod";
-import { aiEnabled, writeBundleCopy } from "@/lib/ai";
+import { aiEnabled, isBusyError, writeBundleCopy } from "@/lib/ai";
 import { getBatch } from "@/lib/db";
 import { readBody } from "@/lib/http";
 import type { Batch } from "@/lib/schema";
@@ -31,7 +30,7 @@ export async function POST(req: Request) {
     return Response.json(copy);
   } catch (err) {
     console.error("bundle copy failed", err);
-    const busy = err instanceof ApiError && [429, 500, 503].includes(err.status);
+    const busy = isBusyError(err);
     return Response.json(
       { error: busy ? "Google's AI is busy right now. Try again in a minute." : "Couldn't write the copy. Please try again." },
       { status: busy ? 503 : 502 },

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/client";
+import ScanBill from "./ScanBill";
 import { CATEGORIES, UNITS, expiryLabel, rupees, today, type Batch, type BatchInput, type Freshness } from "@/lib/schema";
 
 type StockRow = Batch & { daysLeft: number; freshness: Freshness };
@@ -178,7 +179,8 @@ export default function StockPage() {
 
       {/* Rendered after the first load so date defaults use the shop's clock, not the server's. */}
       {rows !== null && (
-        <div className="mt-6">
+        <div className="mt-6 space-y-4">
+          <ScanBill onAdded={load} />
           <AddBatchForm onAdded={load} />
         </div>
       )}
