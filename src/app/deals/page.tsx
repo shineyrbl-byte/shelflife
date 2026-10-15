@@ -55,7 +55,8 @@ export default function DealsPage() {
             <div className="flex items-start gap-3">
               <div className="flex-1">
                 <h2 className="font-semibold">{d.title}</h2>
-                <p className="mt-1 text-sm text-stone-500">{d.items.map((i) => `${i.quantity} ${i.unit} ${i.name}`).join(" + ")}</p>
+                {d.description && <p className="mt-1 text-sm text-stone-700">{d.description}</p>}
+                <p className="mt-1 text-xs text-stone-500">{d.items.map((i) => `${i.quantity} ${i.unit} ${i.name}`).join(" + ")}</p>
               </div>
               <div className="text-right">
                 <div className="text-2xl font-semibold">{rupees(d.price)}</div>

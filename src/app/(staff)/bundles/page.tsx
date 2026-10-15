@@ -13,10 +13,31 @@ const itemsText = (items: { name: string; quantity: number; unit: string }[]) =>
 
 function SuggestionCard({ s, onPublished }: { s: BundleSuggestion; onPublished: () => void }) {
   const [price, setPrice] = useState(String(s.price));
+  const [title, setTitle] = useState(s.title);
+  const [description, setDescription] = useState(s.description);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [writing, setWriting] = useState(false);
   const p = Number(price);
   const off = p > 0 ? Math.round((1 - p / s.originalPrice) * 100) : 0;
+  const items = s.items.map((i) => ({ batchId: i.batchId, quantity: i.quantity }));
+
+  async function writeWithAi() {
+    setWriting(true);
+    setError("");
+    try {
+      const copy = await api<{ title: string; description: string }>("/api/bundles/copy", {
+        method: "POST",
+        body: JSON.stringify({ items, price: p > 0 ? p : s.price }),
+      });
+      setTitle(copy.title);
+      setDescription(copy.description);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setWriting(false);
+    }
+  }
 
   async function publish() {
     setBusy(true);
@@ -25,9 +46,10 @@ function SuggestionCard({ s, onPublished }: { s: BundleSuggestion; onPublished: 
       await api("/api/bundles", {
         method: "POST",
         body: JSON.stringify({
-          title: s.title,
-          description: s.description.replace(/at \d+% off/, `at ${off}% off`),
-          items: s.items.map((i) => ({ batchId: i.batchId, quantity: i.quantity })),
+          title: title.trim() || s.title,
+          // Keep the template's "% off" in step with an edited price.
+          description: description.replace(/at \d+% off/, `at ${off}% off`).trim(),
+          items,
           price: p,
         }),
       });
@@ -41,8 +63,28 @@ function SuggestionCard({ s, onPublished }: { s: BundleSuggestion; onPublished: 
   return (
     <div className="flex flex-col rounded-2xl border border-stone-200 bg-white p-5">
       <div className="text-xs font-medium uppercase tracking-wide text-orange-600">Expires {expiryLabel(s.expiresOn)}</div>
-      <h3 className="mt-1 font-semibold">{s.title}</h3>
+      <input
+        aria-label="Bundle name"
+        value={title}
+        onChange={(e) => setTitle(e.target.value)}
+        className="-mx-1 mt-1 rounded px-1 font-semibold hover:bg-stone-50 focus:bg-stone-50 focus:outline-none"
+      />
       <p className="mt-1 text-sm text-stone-500">{itemsText(s.items)}</p>
+      <textarea
+        aria-label="Description for customers"
+        rows={3}
+        value={description}
+        onChange={(e) => setDescription(e.target.value)}
+        className="mt-2 resize-none rounded-lg border border-stone-200 px-2 py-1.5 text-sm text-stone-700 focus:border-emerald-500 focus:outline-none"
+      />
+      <button
+        type="button"
+        onClick={writeWithAi}
+        disabled={writing}
+        className="mt-1.5 self-start text-xs font-medium text-violet-700 hover:underline disabled:opacity-50"
+      >
+        {writing ? "Writing…" : "✨ Write with AI"}
+      </button>
       <div className="mt-4 flex items-end gap-3">
         <div>
           <div className="text-xs text-stone-500 line-through">{rupees(s.originalPrice)}</div>
