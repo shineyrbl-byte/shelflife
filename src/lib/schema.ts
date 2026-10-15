@@ -2,6 +2,7 @@ import { z } from "zod";
 
 export const CATEGORIES = ["bakery", "dairy", "produce", "beverages", "prepared", "packaged"] as const;
 export const UNITS = ["pcs", "kg", "L", "pack"] as const;
+export type Category = (typeof CATEGORIES)[number];
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD");
 
@@ -75,3 +76,11 @@ export function freshness(expiresOn: string, from = today()): Freshness {
 }
 
 export const rupees = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
+
+/** "today", "tomorrow", or a short date like "Sun, 18 Oct". */
+export function expiryLabel(expiresOn: string, from = today()) {
+  const d = daysLeft(expiresOn, from);
+  if (d === 0) return "today";
+  if (d === 1) return "tomorrow";
+  return new Date(expiresOn + "T00:00:00").toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" });
+}
