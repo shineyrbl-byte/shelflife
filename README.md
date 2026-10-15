@@ -8,6 +8,7 @@ Small cafés and grocers throw away food every day because nobody notices it's a
 npm install
 npm run dev          # http://localhost:3000
 npm run seed         # in a second terminal: a sample café's stock, history and one live bundle
+npm run seed:history # optional: 4 weeks of past sales and waste, for the Insights page
 ```
 
 Optional: copy `.env.example` to `.env.local` and set:
@@ -23,6 +24,7 @@ Everything else works without any keys or accounts, on local SQLite.
 | `/` Dashboard | Owner | Stock value at risk now, expired stock to log, the last 7/30 days (money rescued, waste at cost, rescue rate), and today's summary to send on WhatsApp |
 | `/stock` | Staff | Add deliveries and bakes with an expiry date; stock grouped by urgency; log units as sold or wasted |
 | `/bundles` | Staff | Suggested rescue bundles to publish (price editable); live bundles with a *Sold 1* button for the till |
+| `/insights` | Owner | Ordering tips ("order 9 croissants, not 12"), waste by weekday, and where each item's stock goes |
 | `/deals` | Customers | Phone-friendly list of today's bundles, with a *Share on WhatsApp* button |
 
 ### Rescue bundles (`src/lib/bundles.ts`)
@@ -32,6 +34,10 @@ Everything else works without any keys or accounts, on local SQLite.
 3. Price it at 50% off if it expires today, 40% tomorrow, 30% in two days, rounded to ₹5. The price never goes below what the stock cost.
 4. How many bundles can be sold is computed live from remaining stock, and each sale is recorded in a transaction, so a bundle can never oversell.
 5. Optionally, **✨ Write with AI** (`src/lib/ai.ts`, Gemini free tier) gives the bundle an appetising name and description. AI only writes the words: contents and price stay rule-based, and it's told never to make food sound old or unsafe.
+
+### Ordering tips (`src/lib/insights.ts`)
+
+Looks at finished batches (sold out or expired) from the last 28 days. For each item with at least 3 batches where 15% or more didn't sell at full price, it suggests ordering the amount that sold at full price on 80% of batches. That still covers demand on about 4 days in 5, so the shop runs out occasionally instead of binning stock daily. The saving shown is the cost of the units no longer over-ordered, capped at what was actually left over.
 
 ### Daily summary
 

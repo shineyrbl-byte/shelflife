@@ -4,6 +4,7 @@ const NAV = [
   { href: "/", label: "Dashboard" },
   { href: "/stock", label: "Stock" },
   { href: "/bundles", label: "Bundles" },
+  { href: "/insights", label: "Insights" },
 ];
 
 /** Staff pages get the app navigation; the public /deals page doesn't. */
