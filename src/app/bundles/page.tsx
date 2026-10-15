@@ -1,0 +1,162 @@
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
+import { api } from "@/lib/client";
+import type { BundleSuggestion } from "@/lib/bundles";
+import { expiryLabel, rupees, type Bundle } from "@/lib/schema";
+
+type LiveBundle = Bundle & { available: number };
+
+const itemsText = (items: { name: string; quantity: number; unit: string }[]) =>
+  items.map((i) => `${i.quantity} ${i.unit} ${i.name}`).join(" + ");
+
+function SuggestionCard({ s, onPublished }: { s: BundleSuggestion; onPublished: () => void }) {
+  const [price, setPrice] = useState(String(s.price));
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const p = Number(price);
+  const off = p > 0 ? Math.round((1 - p / s.originalPrice) * 100) : 0;
+
+  async function publish() {
+    setBusy(true);
+    setError("");
+    try {
+      await api("/api/bundles", {
+        method: "POST",
+        body: JSON.stringify({
+          title: s.title,
+          description: s.description.replace(/at \d+% off/, `at ${off}% off`),
+          items: s.items.map((i) => ({ batchId: i.batchId, quantity: i.quantity })),
+          price: p,
+        }),
+      });
+      onPublished();
+    } catch (err) {
+      setError((err as Error).message);
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-col rounded-2xl border border-stone-200 bg-white p-5">
+      <div className="text-xs font-medium uppercase tracking-wide text-orange-600">Expires {expiryLabel(s.expiresOn)}</div>
+      <h3 className="mt-1 font-semibold">{s.title}</h3>
+      <p className="mt-1 text-sm text-stone-500">{itemsText(s.items)}</p>
+      <div className="mt-4 flex items-end gap-3">
+        <div>
+          <div className="text-xs text-stone-500 line-through">{rupees(s.originalPrice)}</div>
+          <label className="flex items-center gap-1 text-lg font-semibold">
+            ₹
+            <input
+              aria-label="Bundle price"
+              inputMode="decimal"
+              value={price}
+              onChange={(e) => setPrice(e.target.value)}
+              className="w-20 rounded-lg border border-stone-300 px-2 py-1"
+            />
+          </label>
+        </div>
+        <div className="pb-1.5 text-sm text-emerald-700">{off > 0 ? `${off}% off` : ""}</div>
+        <div className="ml-auto pb-1.5 text-xs text-stone-500">enough for {s.available}</div>
+      </div>
+      <button
+        onClick={publish}
+        disabled={busy || !(p > 0) || p > s.originalPrice}
+        className="mt-4 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+      >
+        {busy ? "Publishing…" : "Publish to customer deals"}
+      </button>
+      {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
+    </div>
+  );
+}
+
+function LiveBundleRow({ b, onChange }: { b: LiveBundle; onChange: () => void }) {
+  const [error, setError] = useState("");
+  const act = (url: string, method: string) => api(url, { method }).then(onChange, (err) => setError(err.message));
+
+  return (
+    <li className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
+      <div className="min-w-48 flex-1">
+        <div className="font-medium">{b.title}</div>
+        <div className="text-xs text-stone-500">
+          {itemsText(b.items)} · until {expiryLabel(b.expiresOn)}
+        </div>
+      </div>
+      <div className="text-right">
+        <div className="font-semibold">
+          {rupees(b.price)} <span className="text-xs font-normal text-stone-400 line-through">{rupees(b.originalPrice)}</span>
+        </div>
+        <div className="text-xs text-stone-500">
+          {b.soldCount} sold · {b.available} left
+        </div>
+      </div>
+      <button
+        onClick={() => act(`/api/bundles/${b.id}/sell`, "POST")}
+        disabled={b.available < 1}
+        className="rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+      >
+        Sold 1
+      </button>
+      <button onClick={() => act(`/api/bundles/${b.id}`, "DELETE")} className="rounded-lg border border-stone-300 px-3 py-1.5 text-sm hover:bg-stone-50">
+        Take down
+      </button>
+      {error && <p className="w-full text-xs text-red-600">{error}</p>}
+    </li>
+  );
+}
+
+export default function BundlesPage() {
+  const [suggestions, setSuggestions] = useState<BundleSuggestion[] | null>(null);
+  const [live, setLive] = useState<LiveBundle[]>([]);
+
+  const load = useCallback(() => {
+    api<LiveBundle[]>("/api/bundles").then(setLive, () => setLive([]));
+    api<BundleSuggestion[]>("/api/bundles/suggestions").then(setSuggestions, () => setSuggestions([]));
+  }, []);
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  // Hide suggestions that are already live (same items), so publishing one removes it from the list.
+  const key = (items: { batchId: string }[]) => items.map((i) => i.batchId).sort().join();
+  const liveKeys = new Set(live.map((b) => key(b.items)));
+  const fresh = suggestions?.filter((s) => !liveKeys.has(key(s.items)));
+
+  return (
+    <div className="mx-auto max-w-5xl px-5 py-8">
+      <h1 className="text-2xl font-semibold tracking-tight">Rescue bundles</h1>
+      <p className="text-sm text-stone-500">
+        Turn stock that expires in the next 2 days into discounted bundles, instead of throwing it away.
+      </p>
+
+      <section className="mt-6">
+        <h2 className="font-semibold">On sale now</h2>
+        {live.length === 0 ? (
+          <p className="mt-2 text-sm text-stone-500">Nothing on sale yet. Publish a suggestion below.</p>
+        ) : (
+          <ul className="mt-3 divide-y divide-stone-200 rounded-2xl border border-stone-200 bg-white">
+            {live.map((b) => <LiveBundleRow key={b.id} b={b} onChange={load} />)}
+          </ul>
+        )}
+      </section>
+
+      <section className="mt-8">
+        <h2 className="font-semibold">Suggested bundles</h2>
+        <p className="text-sm text-stone-500">
+          Paired by what people buy together, discounted by how soon they expire, and never priced below cost. You can edit the price.
+        </p>
+        {fresh === undefined && <p className="mt-6 text-stone-500">Finding bundles…</p>}
+        {fresh?.length === 0 && (
+          <p className="mt-4 rounded-2xl border border-dashed border-stone-300 p-6 text-center text-sm text-stone-500">
+            Nothing needs rescuing right now. Items expiring within 2 days will show up here. <Link href="/stock" className="text-emerald-700 underline">Check stock</Link>
+          </p>
+        )}
+        <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {fresh?.map((s) => <SuggestionCard key={key(s.items)} s={s} onPublished={load} />)}
+        </div>
+      </section>
+    </div>
+  );
+}
