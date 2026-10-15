@@ -25,6 +25,46 @@ function Card({ label, value, note, tone = "" }: { label: string; value: string;
   );
 }
 
+function DailySummary() {
+  const [text, setText] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    api<{ text: string }>("/api/summary").then((r) => setText(r.text), () => setText(null));
+  }, []);
+
+  if (!text) return null;
+  return (
+    <section className="mt-8 rounded-2xl border border-stone-200 bg-white p-5">
+      <div className="flex flex-wrap items-center gap-2">
+        <h2 className="font-semibold">Today&apos;s summary</h2>
+        <span className="text-sm text-stone-500">Send it to yourself or your team every morning.</span>
+        <div className="ml-auto flex gap-2">
+          <button
+            onClick={() => {
+              navigator.clipboard.writeText(text);
+              setCopied(true);
+              setTimeout(() => setCopied(false), 1500);
+            }}
+            className="rounded-lg border border-stone-300 px-3 py-1.5 text-sm hover:bg-stone-50"
+          >
+            {copied ? "Copied ✓" : "Copy"}
+          </button>
+          <a
+            href={`https://wa.me/?text=${encodeURIComponent(text)}`}
+            target="_blank"
+            rel="noreferrer"
+            className="rounded-lg bg-[#25D366] px-3 py-1.5 text-sm font-medium text-white hover:brightness-95"
+          >
+            Send on WhatsApp
+          </a>
+        </div>
+      </div>
+      <pre className="mt-4 whitespace-pre-wrap rounded-xl bg-stone-50 p-4 font-sans text-sm text-stone-700">{text}</pre>
+    </section>
+  );
+}
+
 export default function Dashboard() {
   const [days, setDays] = useState(7);
   const [r, setR] = useState<Report | null>(null);
@@ -104,6 +144,8 @@ export default function Dashboard() {
           Regular sales: {rupees(r.sold.revenue)} from {r.sold.quantity} units logged as sold.
         </p>
       )}
+
+      <DailySummary />
     </div>
   );
 }
