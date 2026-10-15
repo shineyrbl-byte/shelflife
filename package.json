@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "seed": "node scripts/seed.mjs",
-    "summary": "node --env-file-if-exists=.env.local scripts/summary.mjs"
+    "summary": "node --env-file-if-exists=.env.local scripts/summary.mjs",
+    "seed:history": "node scripts/seed-history.mjs"
   },
   "dependencies": {
     "@google/genai": "^2.30.0",

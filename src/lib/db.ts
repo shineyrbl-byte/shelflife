@@ -99,6 +99,23 @@ export function listStock(): Batch[] {
   return (db.prepare(`${BATCH_SELECT} WHERE remaining > 0 ORDER BY b.expires_on, b.name`).all() as Row[]).map(toBatch);
 }
 
+export type BatchHistory = Batch & Record<Outcome, number>;
+
+/** Batches added since a date (YYYY-MM-DD), with how much of each was sold, rescued and wasted. */
+export function listBatchesSince(since: string): BatchHistory[] {
+  const sum = (o: Outcome) => `COALESCE((SELECT SUM(e.quantity) FROM events e WHERE e.batch_id = b.id AND e.outcome = '${o}'), 0) AS ${o}`;
+  return (
+    db.prepare(`SELECT *, ${sum("sold")}, ${sum("rescued")}, ${sum("wasted")} FROM (${BATCH_SELECT}) b WHERE b.added_on >= ? ORDER BY b.added_on`).all(since) as Row[]
+  ).map((r) => ({ ...toBatch(r), sold: r.sold as number, rescued: r.rescued as number, wasted: r.wasted as number }));
+}
+
+/** Waste events since a date, with their value at cost, for the by-weekday breakdown. */
+export function listWasteSince(since: string): { at: string; cost: number }[] {
+  return db
+    .prepare("SELECT e.at, e.quantity * b.unit_cost AS cost FROM events e JOIN batches b ON b.id = e.batch_id WHERE e.outcome = 'wasted' AND e.at >= ?")
+    .all(since) as { at: string; cost: number }[];
+}
+
 export function deleteBatch(id: string) {
   db.prepare("DELETE FROM events WHERE batch_id = ?").run(id);
   db.prepare("DELETE FROM batches WHERE id = ?").run(id);
