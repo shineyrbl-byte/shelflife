@@ -46,6 +46,7 @@ export type Bundle = {
   originalPrice: number;
   price: number;
   status: "active" | "sold" | "cancelled";
+  soldCount: number;
   /** The bundle can't outlive its earliest-expiring item. */
   expiresOn: string;
   createdAt: string;

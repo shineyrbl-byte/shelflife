@@ -47,6 +47,12 @@ db.exec(`
     expires_on TEXT NOT NULL,
     created_at TEXT NOT NULL
   );
+  CREATE TABLE IF NOT EXISTS bundle_sales (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    bundle_id TEXT NOT NULL REFERENCES bundles(id),
+    price REAL NOT NULL,
+    at TEXT NOT NULL
+  );
 `);
 
 type Row = Record<string, unknown>;
@@ -134,6 +140,8 @@ export function outcomeTotals(since: string): OutcomeTotals {
 
 // ---- Bundles ----
 
+const BUNDLE_SELECT = `SELECT *, (SELECT COUNT(*) FROM bundle_sales s WHERE s.bundle_id = bundles.id) AS sold_count FROM bundles`;
+
 function toBundle(r: Row): Bundle {
   return {
     id: r.id as string,
@@ -143,12 +151,13 @@ function toBundle(r: Row): Bundle {
     originalPrice: r.original_price as number,
     price: r.price as number,
     status: r.status as Bundle["status"],
+    soldCount: r.sold_count as number,
     expiresOn: r.expires_on as string,
     createdAt: r.created_at as string,
   };
 }
 
-export function insertBundle(b: Omit<Bundle, "id" | "status" | "createdAt">): string {
+export function insertBundle(b: Omit<Bundle, "id" | "status" | "soldCount" | "createdAt">): string {
   const id = newId();
   db.prepare(
     `INSERT INTO bundles (id, title, description, items, original_price, price, expires_on, created_at)
@@ -158,15 +167,27 @@ export function insertBundle(b: Omit<Bundle, "id" | "status" | "createdAt">): st
 }
 
 export function getBundle(id: string): Bundle | null {
-  const r = db.prepare("SELECT * FROM bundles WHERE id = ?").get(id) as Row | undefined;
+  const r = db.prepare(`${BUNDLE_SELECT} WHERE id = ?`).get(id) as Row | undefined;
   return r ? toBundle(r) : null;
 }
 
 /** Active bundles that haven't expired, soonest expiry first. */
 export function listActiveBundles(): Bundle[] {
   return (
-    db.prepare("SELECT * FROM bundles WHERE status = 'active' AND expires_on >= ? ORDER BY expires_on").all(today()) as Row[]
+    db.prepare(`${BUNDLE_SELECT} WHERE status = 'active' AND expires_on >= ? ORDER BY expires_on`).all(today()) as Row[]
   ).map(toBundle);
+}
+
+/** Logs one bundle sale: each item's portion leaves its batch as "rescued". */
+export function recordBundleSale(bundle: Bundle) {
+  for (const item of bundle.items) logOutcome(item.batchId, "rescued", item.quantity, bundle.id);
+  db.prepare("INSERT INTO bundle_sales (bundle_id, price, at) VALUES (?, ?, ?)").run(bundle.id, bundle.price, new Date().toISOString());
+}
+
+/** Money taken from bundle sales since a date (YYYY-MM-DD), at the discounted price. */
+export function bundleRevenue(since: string): number {
+  const r = db.prepare("SELECT COALESCE(SUM(price), 0) AS total FROM bundle_sales WHERE at >= ?").get(since) as Row;
+  return r.total as number;
 }
 
 export function setBundleStatus(id: string, status: Bundle["status"]) {

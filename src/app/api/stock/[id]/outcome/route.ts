@@ -1,0 +1,20 @@
+import { z } from "zod";
+import { getBatch, logOutcome } from "@/lib/db";
+import { notFound, readBody } from "@/lib/http";
+
+type Ctx = { params: Promise<{ id: string }> };
+
+// "rescued" is only logged by selling a bundle, so it isn't accepted here.
+const Body = z.object({ outcome: z.enum(["sold", "wasted"]), quantity: z.number().positive() });
+
+export async function POST(req: Request, { params }: Ctx) {
+  const batch = getBatch((await params).id);
+  if (!batch) return notFound();
+  const body = await readBody(req, Body);
+  if (body instanceof Response) return body;
+  if (body.quantity > batch.remaining + 1e-9) {
+    return Response.json({ error: `Only ${batch.remaining} ${batch.unit} left.` }, { status: 409 });
+  }
+  logOutcome(batch.id, body.outcome, body.quantity);
+  return Response.json(getBatch(batch.id));
+}
