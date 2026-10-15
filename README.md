@@ -20,7 +20,7 @@ Everything else works without any keys or accounts, on local SQLite.
 
 | Page | Who | What |
 |---|---|---|
-| `/` Dashboard | Owner | Stock value at risk now, expired stock to log, and the last 7/30 days: money rescued, waste at cost, rescue rate |
+| `/` Dashboard | Owner | Stock value at risk now, expired stock to log, the last 7/30 days (money rescued, waste at cost, rescue rate), and today's summary to send on WhatsApp |
 | `/stock` | Staff | Add deliveries and bakes with an expiry date; stock grouped by urgency; log units as sold or wasted |
 | `/bundles` | Staff | Suggested rescue bundles to publish (price editable); live bundles with a *Sold 1* button for the till |
 | `/deals` | Customers | Phone-friendly list of today's bundles, with a *Share on WhatsApp* button |
@@ -32,6 +32,19 @@ Everything else works without any keys or accounts, on local SQLite.
 3. Price it at 50% off if it expires today, 40% tomorrow, 30% in two days, rounded to ₹5. The price never goes below what the stock cost.
 4. How many bundles can be sold is computed live from remaining stock, and each sale is recorded in a transaction, so a bundle can never oversell.
 5. Optionally, **✨ Write with AI** (`src/lib/ai.ts`, Gemini free tier) gives the bundle an appetising name and description. AI only writes the words: contents and price stay rule-based, and it's told never to make food sound old or unsafe.
+
+### Daily summary
+
+Every morning the owner should know what expires today and tomorrow, what's already expired, and how many bundles are ready. The dashboard shows this summary with **Copy** and **Send on WhatsApp** buttons. To get it as a phone notification instead:
+
+1. Install the free [ntfy](https://ntfy.sh) app and subscribe to a long, hard-to-guess topic name (anyone who knows the name can read it).
+2. Put the same name in `.env.local` as `NTFY_TOPIC=...`.
+3. Run `npm run summary` while the app is running. It prints the summary and pushes it to your phone (high priority if something expires today).
+4. To get it every morning at 8:00, add a cron job (`crontab -e`):
+   ```
+   0 8 * * * cd ~/shelflife && npm run summary
+   ```
+   The app must be running at that time, e.g. on the shop's computer or a server.
 
 ## Architecture
 
@@ -53,4 +66,3 @@ Next.js 16 (App Router, React 19, Tailwind 4)
 
 - Barcode or photo entry for deliveries
 - Multiple shops with logins
-- Daily "expiring today" WhatsApp or email summary for the owner

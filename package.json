@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "seed": "node scripts/seed.mjs"
+    "seed": "node scripts/seed.mjs",
+    "summary": "node --env-file-if-exists=.env.local scripts/summary.mjs"
   },
   "dependencies": {
     "@google/genai": "^2.30.0",
