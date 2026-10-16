@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { api } from "@/lib/client";
+import Team from "./Team";
 
 type ShopSettings = { name: string; slug: string; ntfyTopic: string | null; publicUrl: string };
 
@@ -61,6 +62,8 @@ export default function SettingsPage() {
           </button>
         </div>
       </section>
+
+      <Team />
 
       <form onSubmit={save} className="mt-6 space-y-6 rounded-2xl border border-stone-200 bg-white p-5">
         <label className="block text-sm text-stone-600">

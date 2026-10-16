@@ -1,6 +1,6 @@
 import { connection } from "next/server";
 import { z } from "zod";
-import { requireShop } from "@/lib/auth";
+import { requireOwner } from "@/lib/auth";
 import { getShop, updateShop } from "@/lib/db";
 import { readBody } from "@/lib/http";
 import { NTFY_TOPIC_PATTERN } from "@/lib/notify";
@@ -8,8 +8,9 @@ import { publicDealsUrl } from "@/lib/urls";
 
 export async function GET(req: Request) {
   await connection();
-  const shop = await requireShop();
-  if (shop instanceof Response) return shop;
+  const session = await requireOwner();
+  if (session instanceof Response) return session;
+  const { shop } = session;
   return Response.json({ name: shop.name, slug: shop.slug, ntfyTopic: shop.ntfyTopic, publicUrl: publicDealsUrl(req, shop.slug) });
 }
 
@@ -25,8 +26,9 @@ const Body = z.object({
 
 /** Shop settings. The link name (slug) stays fixed so printed QR posters keep working. */
 export async function PATCH(req: Request) {
-  const shop = await requireShop();
-  if (shop instanceof Response) return shop;
+  const session = await requireOwner();
+  if (session instanceof Response) return session;
+  const { shop } = session;
   const body = await readBody(req, Body);
   if (body instanceof Response) return body;
   await updateShop(shop.id, { name: body.name, ntfyTopic: body.ntfyTopic === undefined ? undefined : body.ntfyTopic || null });

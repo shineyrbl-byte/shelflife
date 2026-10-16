@@ -43,6 +43,16 @@ const SCHEMA = `
     expires_at TEXT NOT NULL
   );
   -- What the shop knows about each barcode, so scanning a known item fills in the details.
+  -- One-time links: staff invites and password resets. Only a hash of each token is stored.
+  CREATE TABLE IF NOT EXISTS tokens (
+    token_hash TEXT PRIMARY KEY,
+    kind TEXT NOT NULL,
+    shop_id TEXT NOT NULL REFERENCES shops(id),
+    user_id TEXT REFERENCES users(id),
+    created_at TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    used_at TEXT
+  );
   CREATE TABLE IF NOT EXISTS products (
     shop_id TEXT NOT NULL REFERENCES shops(id),
     barcode TEXT NOT NULL,
@@ -111,13 +121,18 @@ const SCHEMA = `
   );
 `;
 
-/** Creates tables, and adds shop_id to databases made before shops existed. */
+/** Creates tables, and adds columns that older databases don't have yet. */
 async function migrate(c: Client) {
   await c.executeMultiple(SCHEMA);
-  for (const table of ["batches", "bundles"]) {
+  const addColumn = async (table: string, column: string, definition: string) => {
     const cols = (await c.execute(`PRAGMA table_info(${table})`)).rows.map((r) => r.name);
-    if (!cols.includes("shop_id")) await c.execute(`ALTER TABLE ${table} ADD COLUMN shop_id TEXT REFERENCES shops(id)`);
-  }
+    if (!cols.includes(column)) await c.execute(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+  };
+  await addColumn("batches", "shop_id", "TEXT REFERENCES shops(id)");
+  await addColumn("bundles", "shop_id", "TEXT REFERENCES shops(id)");
+  // Everyone who signed up before staff logins existed is their shop's owner.
+  await addColumn("users", "role", "TEXT NOT NULL DEFAULT 'owner'");
+  await addColumn("users", "name", "TEXT NOT NULL DEFAULT ''");
   await c.executeMultiple(`
     CREATE INDEX IF NOT EXISTS batches_shop ON batches(shop_id, expires_on);
     CREATE INDEX IF NOT EXISTS bundles_shop ON bundles(shop_id, status);
@@ -182,7 +197,16 @@ const newId = () => randomUUID().slice(0, 8);
 // ---- Shops, users, sessions ----
 
 export type Shop = { id: string; name: string; slug: string; ntfyTopic: string | null };
-export type User = { id: string; shopId: string; email: string };
+export type Role = "owner" | "staff";
+export type User = { id: string; shopId: string; email: string; name: string; role: Role };
+
+const toUser = (r: Row, idCol = "id"): User => ({
+  id: r[idCol] as string,
+  shopId: r.shop_id as string,
+  email: r.email as string,
+  name: (r.name as string) ?? "",
+  role: (r.role as Role) ?? "owner",
+});
 
 const toShop = (r: Row): Shop => ({ id: r.id as string, name: r.name as string, slug: r.slug as string, ntfyTopic: (r.ntfy_topic as string) || null });
 
@@ -206,11 +230,11 @@ export async function createShopWithUser(name: string, email: string, passwordHa
     let slug = base;
     for (let n = 2; await one("SELECT 1 FROM shops WHERE slug = ?", [slug], tx); n++) slug = `${base}-${n}`;
     const shop: Shop = { id: newId(), name, slug, ntfyTopic: null };
-    const user: User = { id: newId(), shopId: shop.id, email };
+    const user: User = { id: newId(), shopId: shop.id, email, name: "", role: "owner" };
     const now = new Date().toISOString();
     const isFirst = !(await one("SELECT 1 FROM shops LIMIT 1", [], tx));
     await run("INSERT INTO shops (id, name, slug, created_at) VALUES (?, ?, ?, ?)", [shop.id, name, slug, now], tx);
-    await run("INSERT INTO users (id, shop_id, email, password_hash, created_at) VALUES (?, ?, ?, ?, ?)", [user.id, shop.id, email, passwordHash, now], tx);
+    await run("INSERT INTO users (id, shop_id, email, password_hash, role, created_at) VALUES (?, ?, ?, ?, 'owner', ?)", [user.id, shop.id, email, passwordHash, now], tx);
     if (isFirst) {
       await run("UPDATE batches SET shop_id = ? WHERE shop_id IS NULL", [shop.id], tx);
       await run("UPDATE bundles SET shop_id = ? WHERE shop_id IS NULL", [shop.id], tx);
@@ -219,9 +243,89 @@ export async function createShopWithUser(name: string, email: string, passwordHa
   });
 }
 
-export async function findUserByEmail(email: string): Promise<(User & { passwordHash: string }) | null> {
-  const r = await one("SELECT * FROM users WHERE email = ?", [email]);
-  return r ? { id: r.id as string, shopId: r.shop_id as string, email: r.email as string, passwordHash: r.password_hash as string } : null;
+export async function findUserByEmail(email: string, db: Db = client): Promise<(User & { passwordHash: string }) | null> {
+  const r = await one("SELECT * FROM users WHERE email = ?", [email], db);
+  return r ? { ...toUser(r), passwordHash: r.password_hash as string } : null;
+}
+
+// ---- Team ----
+
+/** Everyone who can log in to the shop, owner first. */
+export async function listTeam(shopId: string): Promise<(User & { createdAt: string })[]> {
+  const rows = await all("SELECT * FROM users WHERE shop_id = ? ORDER BY role = 'owner' DESC, created_at", [shopId]);
+  return rows.map((r) => ({ ...toUser(r), createdAt: r.created_at as string }));
+}
+
+export async function getUser(shopId: string, id: string): Promise<User | null> {
+  const r = await one("SELECT * FROM users WHERE shop_id = ? AND id = ?", [shopId, id]);
+  return r ? toUser(r) : null;
+}
+
+export async function createStaffUser(shopId: string, name: string, email: string, passwordHash: string, db: Db = client): Promise<User> {
+  const user: User = { id: newId(), shopId, email, name, role: "staff" };
+  await run(
+    "INSERT INTO users (id, shop_id, email, name, password_hash, role, created_at) VALUES (?, ?, ?, ?, ?, 'staff', ?)",
+    [user.id, shopId, email, name, passwordHash, new Date().toISOString()],
+    db,
+  );
+  return user;
+}
+
+/** Removes a staff login and logs it out everywhere. Owners can't be removed this way. */
+export async function deleteStaffUser(shopId: string, userId: string) {
+  await transaction(async (tx) => {
+    const r = await one("SELECT 1 FROM users WHERE id = ? AND shop_id = ? AND role = 'staff'", [userId, shopId], tx);
+    if (!r) return;
+    await run("DELETE FROM sessions WHERE user_id = ?", [userId], tx);
+    await run("DELETE FROM tokens WHERE user_id = ?", [userId], tx);
+    await run("DELETE FROM users WHERE id = ?", [userId], tx);
+  });
+}
+
+/** Sets a new password and logs the user out everywhere, so an old session can't keep going. */
+export async function setPassword(userId: string, passwordHash: string, db: Db = client) {
+  await run("UPDATE users SET password_hash = ? WHERE id = ?", [passwordHash, userId], db);
+  await run("DELETE FROM sessions WHERE user_id = ?", [userId], db);
+}
+
+// ---- One-time tokens (invites, password resets) ----
+
+export type TokenKind = "invite" | "reset";
+export type TokenRecord = { kind: TokenKind; shopId: string; userId: string | null; expiresAt: string };
+
+export async function insertToken(t: { tokenHash: string; kind: TokenKind; shopId: string; userId?: string; expiresAt: string }) {
+  await run(
+    "INSERT INTO tokens (token_hash, kind, shop_id, user_id, created_at, expires_at) VALUES (?, ?, ?, ?, ?, ?)",
+    [t.tokenHash, t.kind, t.shopId, t.userId ?? null, new Date().toISOString(), t.expiresAt],
+  );
+}
+
+/** A token that exists, hasn't been used and hasn't expired. */
+export async function findValidToken(tokenHash: string, kind: TokenKind, db: Db = client): Promise<TokenRecord | null> {
+  const r = await one("SELECT * FROM tokens WHERE token_hash = ? AND kind = ? AND used_at IS NULL AND expires_at > ?", [tokenHash, kind, new Date().toISOString()], db);
+  return r ? { kind, shopId: r.shop_id as string, userId: (r.user_id as string) || null, expiresAt: r.expires_at as string } : null;
+}
+
+export async function markTokenUsed(tokenHash: string, db: Db = client) {
+  await run("UPDATE tokens SET used_at = ? WHERE token_hash = ?", [new Date().toISOString(), tokenHash], db);
+}
+
+/** Invite links that are still open, newest first. The id is the token's hash, which can't be turned back into the link. */
+export async function listOpenInvites(shopId: string): Promise<{ id: string; createdAt: string; expiresAt: string }[]> {
+  const rows = await all(
+    "SELECT token_hash, created_at, expires_at FROM tokens WHERE shop_id = ? AND kind = 'invite' AND used_at IS NULL AND expires_at > ? ORDER BY created_at DESC",
+    [shopId, new Date().toISOString()],
+  );
+  return rows.map((r) => ({ id: r.token_hash as string, createdAt: r.created_at as string, expiresAt: r.expires_at as string }));
+}
+
+export async function revokeInvite(shopId: string, tokenHash: string) {
+  await run("UPDATE tokens SET used_at = ? WHERE token_hash = ? AND shop_id = ? AND kind = 'invite'", [new Date().toISOString(), tokenHash, shopId]);
+}
+
+/** Recent reset links for a user, to stop someone flooding their inbox. */
+export async function countRecentResets(userId: string, sinceIso: string): Promise<number> {
+  return ((await one("SELECT COUNT(*) AS n FROM tokens WHERE kind = 'reset' AND user_id = ? AND created_at > ?", [userId, sinceIso]))?.n as number) ?? 0;
 }
 
 export async function getShop(id: string): Promise<Shop | null> {
@@ -251,13 +355,16 @@ export async function insertSession(tokenHash: string, userId: string, expiresAt
 /** The user and shop behind a session token hash, if it hasn't expired. */
 export async function findSession(tokenHash: string): Promise<{ user: User; shop: Shop } | null> {
   const r = await one(
-    `SELECT u.id AS user_id, u.email, s.* FROM sessions x
+    `SELECT u.id AS user_id, u.email, u.name AS user_name, u.role, s.* FROM sessions x
      JOIN users u ON u.id = x.user_id JOIN shops s ON s.id = u.shop_id
      WHERE x.token_hash = ? AND x.expires_at > ?`,
     [tokenHash, new Date().toISOString()],
   );
   if (!r) return null;
-  return { user: { id: r.user_id as string, shopId: r.id as string, email: r.email as string }, shop: toShop(r) };
+  return {
+    user: { id: r.user_id as string, shopId: r.id as string, email: r.email as string, name: (r.user_name as string) ?? "", role: (r.role as Role) ?? "owner" },
+    shop: toShop(r),
+  };
 }
 
 export async function deleteSession(tokenHash: string) {

@@ -1,5 +1,5 @@
 import { connection } from "next/server";
-import { requireShop } from "@/lib/auth";
+import { requireOwner } from "@/lib/auth";
 import { rescueTotals } from "@/lib/db";
 import { impactOf } from "@/lib/impact";
 import { today } from "@/lib/schema";
@@ -7,8 +7,9 @@ import { today } from "@/lib/schema";
 /** The shop's impact this month and since it started using ShelfLife. */
 export async function GET() {
   await connection();
-  const shop = await requireShop();
-  if (shop instanceof Response) return shop;
+  const session = await requireOwner();
+  if (session instanceof Response) return session;
+  const { shop } = session;
   const monthStart = today().slice(0, 8) + "01";
   const [month, allTime] = await Promise.all([rescueTotals(shop.id, monthStart), rescueTotals(shop.id)]);
   return Response.json({

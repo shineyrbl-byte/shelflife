@@ -25,7 +25,13 @@ export async function verifyPassword(password: string, stored: string): Promise<
   return timingSafeEqual(actual, expected);
 }
 
-const hashToken = (token: string) => createHash("sha256").update(token).digest("base64url");
+export const hashToken = (token: string) => createHash("sha256").update(token).digest("base64url");
+
+/** A random token for a one-time link, and the hash to store. */
+export function newToken() {
+  const token = randomBytes(32).toString("base64url");
+  return { token, tokenHash: hashToken(token) };
+}
 
 /** Starts a session for the user and sets the cookie. */
 export async function startSession(userId: string) {
@@ -61,4 +67,15 @@ export async function currentSession(): Promise<{ user: User; shop: Shop } | nul
 export async function requireShop(): Promise<Shop | Response> {
   const session = await currentSession();
   return session ? session.shop : Response.json({ error: "Please log in again." }, { status: 401 });
+}
+
+/**
+ * For owner-only routes (money reports, settings, team): the session if the user is the owner,
+ * otherwise a 401/403 response to return as is.
+ */
+export async function requireOwner(): Promise<{ user: User; shop: Shop } | Response> {
+  const session = await currentSession();
+  if (!session) return Response.json({ error: "Please log in again." }, { status: 401 });
+  if (session.user.role !== "owner") return Response.json({ error: "Only the shop owner can do this." }, { status: 403 });
+  return session;
 }

@@ -1,4 +1,4 @@
-import { requireShop } from "@/lib/auth";
+import { requireOwner } from "@/lib/auth";
 import { connection } from "next/server";
 import { bundleRevenue, listStock, outcomeTotals } from "@/lib/db";
 import { freshness, today } from "@/lib/schema";
@@ -6,8 +6,9 @@ import { freshness, today } from "@/lib/schema";
 /** Waste vs. rescue over the last N days (default 7), plus the stock value at risk right now. */
 export async function GET(req: Request) {
   await connection();
-  const shop = await requireShop();
-  if (shop instanceof Response) return shop;
+  const session = await requireOwner();
+  if (session instanceof Response) return session;
+  const { shop } = session;
   const days = Math.min(Math.max(Number(new URL(req.url).searchParams.get("days")) || 7, 1), 365);
   const since = today(new Date(Date.now() - (days - 1) * 86400000));
   const [totals, stock, rescuedRevenue] = await Promise.all([outcomeTotals(shop.id, since), listStock(shop.id), bundleRevenue(shop.id, since)]);

@@ -9,6 +9,8 @@ export async function GET(req: Request) {
   if (!session) return Response.json({ error: "Not logged in." }, { status: 401 });
   return Response.json({
     email: session.user.email,
+    name: session.user.name,
+    role: session.user.role,
     shop: { name: session.shop.name, slug: session.shop.slug, publicUrl: publicDealsUrl(req, session.shop.slug) },
   });
 }
