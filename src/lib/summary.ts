@@ -22,8 +22,9 @@ export async function buildSummary(shop: Shop, appUrl: string, now = new Date())
   const expired = stock.filter((b) => freshness(b.expiresOn, day) === "expired");
   const suggestions = notYetLive(suggestBundles(stock, day), live);
 
-  const atEnd = totals.wasted.quantity + totals.rescued.quantity;
-  const rate = atEnd ? `, rescue rate ${Math.round((totals.rescued.quantity / atEnd) * 100)}%` : "";
+  const saved = totals.rescued.quantity + totals.donated.quantity;
+  const atEnd = totals.wasted.quantity + saved;
+  const rate = atEnd ? `, ${Math.round((saved / atEnd) * 100)}% saved from the bin` : "";
 
   const dateLabel = new Date(day + "T00:00:00").toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "short" });
   const parts = [
@@ -34,7 +35,7 @@ export async function buildSummary(shop: Shop, appUrl: string, now = new Date())
     !expiringToday.length && !tomorrow.length && !expired.length ? "✅ Nothing expires today or tomorrow." : null,
     live.length ? `🛍️ ${live.length} bundle${live.length > 1 ? "s" : ""} on sale: ${live.map((b) => b.title).join("; ")}` : null,
     suggestions.length ? `💡 ${suggestions.length} rescue bundle${suggestions.length > 1 ? "s" : ""} ready to publish: ${appUrl}/bundles` : null,
-    `📈 Last 7 days: ${rupees(rescued)} rescued with bundles, ${rupees(totals.wasted.cost)} wasted${rate}.`,
+    `📈 Last 7 days: ${rupees(rescued)} rescued with bundles${totals.donated.quantity ? `, ${+totals.donated.quantity.toFixed(2)} units donated` : ""}, ${rupees(totals.wasted.cost)} wasted${rate}.`,
   ];
   return {
     text: parts.filter(Boolean).join("\n\n"),

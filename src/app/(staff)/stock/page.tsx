@@ -246,7 +246,7 @@ function StockLine({ b, onChange }: { b: StockRow; onChange: () => void }) {
   const [error, setError] = useState("");
   const amount = qty === "" ? b.remaining : Number(qty);
 
-  async function log(outcome: "sold" | "wasted") {
+  async function log(outcome: "sold" | "wasted" | "donated") {
     setError("");
     try {
       await api(`/api/stock/${b.id}/outcome`, { method: "POST", body: JSON.stringify({ outcome, quantity: amount }) });
@@ -297,6 +297,11 @@ function StockLine({ b, onChange }: { b: StockRow; onChange: () => void }) {
         />
         {b.freshness !== "expired" && (
           <button onClick={() => log("sold")} className="rounded-lg border border-stone-300 px-2.5 py-1.5 text-sm hover:bg-stone-50">Sold</button>
+        )}
+        {b.freshness !== "expired" && (
+          <button onClick={() => log("donated")} title="Given to a food bank, NGO or people in need" className="rounded-lg border border-sky-200 px-2.5 py-1.5 text-sm text-sky-700 hover:bg-sky-50">
+            Donated
+          </button>
         )}
         <button onClick={() => log("wasted")} className="rounded-lg border border-red-200 px-2.5 py-1.5 text-sm text-red-700 hover:bg-red-50">Wasted</button>
         <button onClick={() => setEditing(true)} title="Edit" className="px-1 text-stone-400 hover:text-stone-700">✎</button>

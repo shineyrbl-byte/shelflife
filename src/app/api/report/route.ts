@@ -21,6 +21,7 @@ export async function GET(req: Request) {
     sold: totals.sold,
     wasted: totals.wasted,
     rescued: { ...totals.rescued, revenue: rescuedRevenue },
+    donated: totals.donated,
     atRisk: { batches: atRisk.length, cost: costOf(atRisk) },
     expired: { batches: expired.length, cost: costOf(expired) },
   });

@@ -14,6 +14,8 @@ export type ItemInsight = {
   sold: number;
   /** Sold at a discount in rescue bundles. */
   rescued: number;
+  /** Given away before expiry. */
+  donated: number;
   /** Logged as wasted, plus anything left in a batch after it expired. */
   wasted: number;
   wasteCost: number;
@@ -57,6 +59,7 @@ export function itemInsights(history: BatchHistory[], day = today()): ItemInsigh
         ordered: round1(ordered),
         sold: round1(sold),
         rescued: round1(sum((b) => b.rescued)),
+        donated: round1(sum((b) => b.donated)),
         wasted: round1(sum(wastedQty)),
         wasteCost: sum((b) => wastedQty(b) * b.unitCost),
         leftoverRate: ordered ? 1 - sold / ordered : 0,
@@ -98,7 +101,7 @@ export function orderTips(history: BatchHistory[], day = today()): OrderTip[] {
       avgOrder: round1(avgOrder),
       suggested,
       monthlySaving: Math.min(avgOrder - suggested, avgLeftover) * avgCost * batchesPerMonth,
-      reason: `On average ${round1(item.sold / item.batches)} of ${round1(avgOrder)} sold at full price; ${Math.round(item.leftoverRate * 100)}% went to bundles or the bin. ${suggested} would have covered full-price demand on about 4 days in 5.`,
+      reason: `On average ${round1(item.sold / item.batches)} of ${round1(avgOrder)} sold at full price; ${Math.round(item.leftoverRate * 100)}% went to bundles, donations or the bin. ${suggested} would have covered full-price demand on about 4 days in 5.`,
     });
   }
   return tips.sort((a, b) => b.monthlySaving - a.monthlySaving);

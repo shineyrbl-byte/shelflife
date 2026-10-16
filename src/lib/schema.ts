@@ -30,8 +30,9 @@ export type Batch = BatchInput & {
   remaining: number;
 };
 
-// What happened to some of a batch. "rescued" = sold as part of a rescue bundle.
-export const OUTCOMES = ["sold", "wasted", "rescued"] as const;
+// What happened to some of a batch. "rescued" = sold as part of a rescue bundle;
+// "donated" = given to a food bank, NGO or people in need before it expired.
+export const OUTCOMES = ["sold", "wasted", "rescued", "donated"] as const;
 export type Outcome = (typeof OUTCOMES)[number];
 
 export const OutcomeInputSchema = z.object({
