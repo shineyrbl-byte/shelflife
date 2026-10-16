@@ -136,6 +136,9 @@ async function migrate(c: Client) {
   // Customer deal alerts: on by default; the public ntfy topic is created when first needed.
   await addColumn("shops", "deal_alerts", "INTEGER NOT NULL DEFAULT 1");
   await addColumn("shops", "alerts_topic", "TEXT");
+  // UPI pre-payment: the shop's UPI ID, and when a customer said they'd paid for a reservation.
+  await addColumn("shops", "upi_id", "TEXT");
+  await addColumn("reservations", "upi_claimed_at", "TEXT");
   await c.executeMultiple(`
     CREATE INDEX IF NOT EXISTS batches_shop ON batches(shop_id, expires_on);
     CREATE INDEX IF NOT EXISTS bundles_shop ON bundles(shop_id, status);
@@ -199,7 +202,15 @@ const newId = () => randomUUID().slice(0, 8);
 
 // ---- Shops, users, sessions ----
 
-export type Shop = { id: string; name: string; slug: string; ntfyTopic: string | null; dealAlerts: boolean; alertsTopic: string | null };
+export type Shop = {
+  id: string;
+  name: string;
+  slug: string;
+  ntfyTopic: string | null;
+  dealAlerts: boolean;
+  alertsTopic: string | null;
+  upiId: string | null;
+};
 export type Role = "owner" | "staff";
 export type User = { id: string; shopId: string; email: string; name: string; role: Role };
 
@@ -218,6 +229,7 @@ const toShop = (r: Row): Shop => ({
   ntfyTopic: (r.ntfy_topic as string) || null,
   dealAlerts: r.deal_alerts === undefined || r.deal_alerts === null ? true : Boolean(r.deal_alerts),
   alertsTopic: (r.alerts_topic as string) || null,
+  upiId: (r.upi_id as string) || null,
 });
 
 /** "Café Mogra, Goa!" -> "cafe-mogra-goa" */
@@ -239,7 +251,7 @@ export async function createShopWithUser(name: string, email: string, passwordHa
     const base = slugify(name);
     let slug = base;
     for (let n = 2; await one("SELECT 1 FROM shops WHERE slug = ?", [slug], tx); n++) slug = `${base}-${n}`;
-    const shop: Shop = { id: newId(), name, slug, ntfyTopic: null, dealAlerts: true, alertsTopic: null };
+    const shop: Shop = { id: newId(), name, slug, ntfyTopic: null, dealAlerts: true, alertsTopic: null, upiId: null };
     const user: User = { id: newId(), shopId: shop.id, email, name: "", role: "owner" };
     const now = new Date().toISOString();
     const isFirst = !(await one("SELECT 1 FROM shops LIMIT 1", [], tx));
@@ -348,7 +360,8 @@ export async function getShopBySlug(slug: string): Promise<Shop | null> {
   return r ? toShop(r) : null;
 }
 
-export async function updateShop(id: string, patch: { name?: string; ntfyTopic?: string | null; dealAlerts?: boolean }) {
+export async function updateShop(id: string, patch: { name?: string; ntfyTopic?: string | null; dealAlerts?: boolean; upiId?: string | null }) {
+  if (patch.upiId !== undefined) await run("UPDATE shops SET upi_id = ? WHERE id = ?", [patch.upiId, id]);
   if (patch.dealAlerts !== undefined) await run("UPDATE shops SET deal_alerts = ? WHERE id = ?", [patch.dealAlerts ? 1 : 0, id]);
   if (patch.name !== undefined) await run("UPDATE shops SET name = ? WHERE id = ?", [patch.name, id]);
   if (patch.ntfyTopic !== undefined) await run("UPDATE shops SET ntfy_topic = ? WHERE id = ?", [patch.ntfyTopic, id]);
@@ -610,6 +623,8 @@ export type Reservation = {
   customerName: string;
   code: string;
   status: "held" | "collected" | "cancelled";
+  /** The customer tapped "I've paid" after paying by UPI. Unverified: staff check their UPI app. */
+  upiClaimed: boolean;
   createdAt: string;
   expiresAt: string;
 };
@@ -624,6 +639,7 @@ const toReservation = (r: Row): Reservation => ({
   customerName: r.customer_name as string,
   code: r.code as string,
   status: r.status as Reservation["status"],
+  upiClaimed: Boolean(r.upi_claimed_at),
   createdAt: r.created_at as string,
   expiresAt: r.expires_at as string,
 });
@@ -680,6 +696,10 @@ export async function listOpenReservations(shopId: string): Promise<Reservation[
   return (await all(`${RESERVATION_SELECT} WHERE r.shop_id = ? AND r.status = 'held' AND r.expires_at > ? ORDER BY r.expires_at`, [shopId, since])).map(
     toReservation,
   );
+}
+
+export async function markUpiClaimed(shopId: string, id: string) {
+  await run("UPDATE reservations SET upi_claimed_at = ? WHERE id = ? AND shop_id = ? AND upi_claimed_at IS NULL", [new Date().toISOString(), id, shopId]);
 }
 
 export async function setReservationStatus(shopId: string, id: string, status: Reservation["status"], db: Db = client) {

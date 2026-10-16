@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/client";
 import Team from "./Team";
 
-type ShopSettings = { name: string; slug: string; ntfyTopic: string | null; dealAlerts: boolean; publicUrl: string };
+type ShopSettings = { name: string; slug: string; ntfyTopic: string | null; dealAlerts: boolean; upiId: string | null; publicUrl: string };
 
 /** A hard-to-guess topic, e.g. "shelflife-cafe-mogra-k3x9q2p7". */
 const randomTopic = (slug: string) => `shelflife-${slug.slice(0, 24)}-${Math.random().toString(36).slice(2, 10)}`;
@@ -14,6 +14,7 @@ export default function SettingsPage() {
   const [name, setName] = useState("");
   const [topic, setTopic] = useState("");
   const [dealAlerts, setDealAlerts] = useState(true);
+  const [upiId, setUpiId] = useState("");
   const [status, setStatus] = useState<{ ok: boolean; text: string } | null>(null);
   const [copied, setCopied] = useState(false);
 
@@ -23,6 +24,7 @@ export default function SettingsPage() {
       setName(s.name);
       setTopic(s.ntfyTopic ?? "");
       setDealAlerts(s.dealAlerts);
+      setUpiId(s.upiId ?? "");
     });
   }, []);
 
@@ -30,7 +32,7 @@ export default function SettingsPage() {
     e.preventDefault();
     setStatus(null);
     try {
-      const s = await api<ShopSettings>("/api/shop", { method: "PATCH", body: JSON.stringify({ name, ntfyTopic: topic, dealAlerts }) });
+      const s = await api<ShopSettings>("/api/shop", { method: "PATCH", body: JSON.stringify({ name, ntfyTopic: topic, dealAlerts, upiId }) });
       setShop(s);
       setStatus({ ok: true, text: "Saved." });
     } catch (err) {
@@ -72,6 +74,15 @@ export default function SettingsPage() {
           Shop name
           <input className={input} value={name} onChange={(e) => setName(e.target.value)} />
           <span className="text-xs text-stone-400">Shown to customers, on the poster and in summaries.</span>
+        </label>
+
+        <label className="block text-sm text-stone-600">
+          <span className="font-medium text-stone-800">UPI ID for paying ahead (optional)</span>
+          <input className={input} placeholder="e.g. yourcafe@okhdfcbank" value={upiId} onChange={(e) => setUpiId(e.target.value)} />
+          <span className="text-xs text-stone-400">
+            Customers who reserve a bundle can pay ahead with any UPI app. ShelfLife can&apos;t see payments, so check your UPI app for the
+            amount and the note &ldquo;ShelfLife &lt;pickup code&gt;&rdquo; before handing over. Leave empty to take payment only at the counter.
+          </span>
         </label>
 
         <label className="flex items-start gap-3 text-sm">

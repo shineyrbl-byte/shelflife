@@ -30,7 +30,14 @@ export async function GET(req: Request, { params }: Ctx) {
   const { kgRescued } = impactOf(rescued.rows, rescued.money, rescued.bundlesSold);
   const alerts = shop.dealAlerts ? await ensureAlertsTopic(shop) : null;
   return Response.json({
-    shop: { name: shop.name, publicUrl: publicDealsUrl(req, shop.slug), kgRescued, alerts: alerts && { topic: alerts, url: topicUrl(alerts) } },
+    shop: {
+      name: shop.name,
+      publicUrl: publicDealsUrl(req, shop.slug),
+      kgRescued,
+      alerts: alerts && { topic: alerts, url: topicUrl(alerts) },
+      // A UPI ID isn't secret (shops print it on QR stands); customers need it to pay ahead.
+      upiId: shop.upiId,
+    },
     deals,
   });
 }

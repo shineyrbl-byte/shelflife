@@ -69,6 +69,10 @@ Staff screens (header, Stock, bill and barcode scanning, Bundles, Join) and the 
 
 The dashboard shows food rescued (kg), CO₂ avoided and money recovered, this month and in total, with a **Share it** button that writes a WhatsApp message. Food sold by kg or litre counts as is; pieces and packs use a typical weight per category (e.g. 80 g for bakery, 250 g for prepared food). CO₂ uses about 2.5 kg CO₂e per kg of food not wasted, the FAO's global average for food waste. Both are labelled as estimates wherever they appear. The customer page shows the shop's total, and the homepage shows totals across all shops.
 
+### Paying ahead with UPI
+
+If the owner adds the shop's UPI ID in **Settings**, a customer who reserves a bundle sees **Pay ₹35 now with UPI**: a standard `upi://pay` link (NPCI format) that opens GPay, PhonePe, Paytm or any UPI app with the amount and the note `ShelfLife <pickup code>` filled in, or a QR code on a computer. They then tap **I've paid**. ShelfLife can't see payments (that needs a payment gateway, with fees and business KYC), so the reservation shows **Says paid by UPI** to staff with a reminder to check their UPI app for that amount and note before handing over. After that, only the shop can cancel, so a refund isn't forgotten.
+
 ### Deal alerts for customers
 
 Each shop gets a public [ntfy](https://ntfy.sh) topic (e.g. `shelflife-cafe-mogra-1a2b3c4d`, created on first use). On the deals page, **🔔 Get deal alerts** shows how to follow it: in the browser through ntfy's web app, or in the free ntfy app, with no account. Every time staff publish a bundle, followers get *New deal at Café Mogra: Croissant ₹35 (was ₹60), until today*, linking back to the deals page. It's sent as ntfy JSON so ₹ and non-English names work, and a failed alert never blocks publishing. Owners can switch it off in **Settings**. Deals are public anyway, so the topic is too.

@@ -6,9 +6,19 @@ import { api } from "@/lib/client";
 import { notYetLive, type BundleSuggestion } from "@/lib/bundles";
 import { useT } from "@/lib/i18n";
 import { rupees, type Bundle } from "@/lib/schema";
+import { upiNote } from "@/lib/upi";
 
 type LiveBundle = Bundle & { available: number; held: number };
-type Reservation = { id: string; bundleTitle: string; price: number; customerName: string; code: string; expiresAt: string; expired: boolean };
+type Reservation = {
+  id: string;
+  bundleTitle: string;
+  price: number;
+  customerName: string;
+  code: string;
+  expiresAt: string;
+  expired: boolean;
+  upiClaimed: boolean;
+};
 
 /** Customer pre-orders waiting at the counter. Matching the 4-digit code confirms it's the right person. */
 function Reservations({ list, onChange }: { list: Reservation[]; onChange: () => void }) {
@@ -32,10 +42,16 @@ function Reservations({ list, onChange }: { list: Reservation[]; onChange: () =>
           <li key={r.id} className={`flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 ${r.expired ? "opacity-60" : ""}`}>
             <div className="w-16 text-2xl font-bold tracking-widest tabular-nums">{r.code}</div>
             <div className="min-w-40 flex-1">
-              <div className="font-medium">{r.customerName}</div>
+              <div className="font-medium">
+                {r.customerName}
+                {r.upiClaimed && (
+                  <span className="ml-2 rounded-full bg-violet-100 px-2 py-0.5 text-xs font-medium text-violet-800">{t("bundles.upiClaimed")}</span>
+                )}
+              </div>
               <div className="text-xs text-stone-500">
                 {r.bundleTitle} · {rupees(r.price)} · {r.expired ? t("bundles.holdEnded", { time: time(r.expiresAt) }) : t("bundles.pickUpBy", { time: time(r.expiresAt) })}
               </div>
+              {r.upiClaimed && <div className="mt-1 text-xs text-violet-800">{t("bundles.upiCheck", { price: rupees(r.price), note: upiNote(r.code) })}</div>}
             </div>
             <button onClick={() => act(r.id, "collect")} className="rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-700">
               {t("bundles.pickedUp")}
