@@ -6,16 +6,27 @@ Small cafés and grocers throw away food every day because nobody notices it's a
 
 ```bash
 npm install
-npm run dev          # http://localhost:3000
-npm run seed         # in a second terminal: a sample café's stock, history and one live bundle
-npm run seed:history # optional: 4 weeks of past sales and waste, for the Insights page
+npm run dev          # http://localhost:3000, then "Set up your shop"
+npm run seed         # in a second terminal: a demo café (local demo login) with stock and one live bundle
+npm run seed:history # optional: 4 weeks of past sales and waste for the Insights page (add --shop <name> if you have several shops)
 ```
 
+`npm run seed` prints the demo shop's login when it's done. To fill your own shop instead, pass `-- --email you@cafe.com --password …`.
+
 Optional: copy `.env.example` to `.env.local` and set:
-- `NEXT_PUBLIC_SHOP_NAME`: shown to customers.
 - `GEMINI_API_KEY`: a free key from [aistudio.google.com/apikey](https://aistudio.google.com/apikey) turns on **📷 Scan a bill** and **✨ Write with AI** for bundle names and descriptions.
 
-Everything else works without any keys or accounts, on a local SQLite file.
+Everything else works without any keys, on a local SQLite file.
+
+## Accounts and shops
+
+Each café signs up with its shop name, email and password, and only ever sees its own stock, bundles and reports. Every database query is filtered by the logged-in shop, and the API answers *not found* for another shop's ids.
+
+- Passwords are hashed with scrypt (Node's built-in crypto); no third-party auth service.
+- Sessions are random tokens in an httpOnly cookie, valid for 30 days; the database stores only their SHA-256 hash.
+- `src/proxy.ts` sends logged-out visitors on staff pages to `/login`; each API route checks the session itself.
+- Each shop gets a public customer page at `/s/<shop-name>`, e.g. `/s/cafe-mogra`.
+- Data created before accounts existed is given to the first shop that signs up, so an existing local setup keeps its data.
 
 ## How it works
 
@@ -25,7 +36,8 @@ Everything else works without any keys or accounts, on a local SQLite file.
 | `/stock` | Staff | Scan a supplier bill or add deliveries by hand, with expiry dates; stock grouped by urgency; log units as sold or wasted |
 | `/bundles` | Staff | Suggested rescue bundles to publish (price editable); live bundles with a *Sold 1* button for the till |
 | `/insights` | Owner | Ordering tips ("order 9 croissants, not 12"), waste by weekday, and where each item's stock goes |
-| `/deals` | Customers | Phone-friendly list of today's bundles, with a *Share on WhatsApp* button |
+| `/poster` | Staff | Printable A4 poster with a QR code to the shop's deals page |
+| `/s/<shop>` | Customers | Phone-friendly list of the shop's bundles today, with a *Share on WhatsApp* button |
 
 ### Rescue bundles (`src/lib/bundles.ts`)
 
@@ -48,11 +60,11 @@ Looks at finished batches (sold out or expired) from the last 28 days. For each 
 Every morning the owner should know what expires today and tomorrow, what's already expired, and how many bundles are ready. The dashboard shows this summary with **Copy** and **Send on WhatsApp** buttons. To get it as a phone notification instead:
 
 1. Install the free [ntfy](https://ntfy.sh) app and subscribe to a long, hard-to-guess topic name (anyone who knows the name can read it).
-2. Put the same name in `.env.local` as `NTFY_TOPIC=...`.
-3. Run `npm run summary` while the app is running. It prints the summary and pushes it to your phone (high priority if something expires today).
+2. In `.env.local`, set `NTFY_TOPIC=...` to the same name, and `CRON_SECRET=...` to any long random string. Restart the app.
+3. Run `npm run summary -- --shop <your shop's link name>` while the app is running. It prints the summary and pushes it to your phone (high priority if something expires today).
 4. To get it every morning at 8:00, add a cron job (`crontab -e`):
    ```
-   0 8 * * * cd ~/shelflife && npm run summary
+   0 8 * * * cd ~/shelflife && npm run summary -- --shop cafe-mogra
    ```
    The app must be running at that time, e.g. on the shop's computer or a server.
 
@@ -60,15 +72,18 @@ Every morning the owner should know what expires today and tomorrow, what's alre
 
 ```
 Next.js 16 (App Router, React 19, Tailwind 4)
-├─ src/app/(staff)/     Dashboard, Stock, Bundles (staff nav)
-├─ src/app/deals/       public customer page
+├─ src/app/(staff)/     Dashboard, Stock, Bundles, Insights, Poster (staff nav, login required)
+├─ src/app/s/[slug]/    public customer deals page per shop
+├─ src/app/login, signup
+├─ src/proxy.ts         redirects logged-out visitors on staff pages to /login
+├─ src/lib/auth.ts      password hashing, sessions, requireShop()
 ├─ src/app/api/         stock, outcomes, bundles, suggestions, report
 ├─ src/lib/schema.ts    Zod input schemas, types, expiry helpers
 ├─ src/lib/bundles.ts   rescue bundle engine (pure functions)
 └─ src/lib/db.ts        libSQL (SQLite-compatible), the only file that touches the database
 ```
 
-- **Local file or hosted database, same code.** \`db.ts\` uses libSQL: a SQLite file in \`data/\` by default, or a hosted [Turso](https://turso.tech) database when \`TURSO_DATABASE_URL\` and \`TURSO_AUTH_TOKEN\` are set.
+- **Local file or hosted database, same code.** `db.ts` uses libSQL: a SQLite file in `data/` by default, or a hosted [Turso](https://turso.tech) database when `TURSO_DATABASE_URL` and `TURSO_AUTH_TOKEN` are set.
 - **Nothing derived is stored.** A batch's remaining stock = its quantity minus logged events (sold / wasted / rescued), so numbers can't drift out of sync.
 - **Money is valued two ways.** Waste is counted at cost (what the shop actually lost); bundle revenue is what customers paid.
 - **Server decides prices.** When a bundle is published, normal prices and expiry come from the stock records, not the browser.

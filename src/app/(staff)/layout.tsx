@@ -1,4 +1,5 @@
 import Link from "next/link";
+import ShopMenu from "./ShopMenu";
 
 const NAV = [
   { href: "/", label: "Dashboard" },
@@ -25,9 +26,7 @@ export default function StaffLayout({ children }: LayoutProps<"/">) {
                 {n.label}
               </Link>
             ))}
-            <Link href="/deals" target="_blank" className="rounded-lg bg-emerald-600 px-3.5 py-1.5 font-medium text-white hover:bg-emerald-700">
-              Customer deals ↗
-            </Link>
+            <ShopMenu />
           </div>
         </nav>
       </header>

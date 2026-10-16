@@ -1,3 +1,4 @@
+import { requireShop } from "@/lib/auth";
 import { z } from "zod";
 import { getBatch, logOutcome } from "@/lib/db";
 import { notFound, readBody } from "@/lib/http";
@@ -8,7 +9,9 @@ type Ctx = { params: Promise<{ id: string }> };
 const Body = z.object({ outcome: z.enum(["sold", "wasted"]), quantity: z.number().positive() });
 
 export async function POST(req: Request, { params }: Ctx) {
-  const batch = await getBatch((await params).id);
+  const shop = await requireShop();
+  if (shop instanceof Response) return shop;
+  const batch = await getBatch(shop.id, (await params).id);
   if (!batch) return notFound();
   const body = await readBody(req, Body);
   if (body instanceof Response) return body;
@@ -16,5 +19,5 @@ export async function POST(req: Request, { params }: Ctx) {
     return Response.json({ error: `Only ${batch.remaining} ${batch.unit} left.` }, { status: 409 });
   }
   await logOutcome(batch.id, body.outcome, body.quantity);
-  return Response.json(await getBatch(batch.id));
+  return Response.json(await getBatch(shop.id, batch.id));
 }

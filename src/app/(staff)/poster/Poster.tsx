@@ -3,12 +3,21 @@
 import { useEffect, useState } from "react";
 import QRCode from "qrcode";
 
-const SHOP = process.env.NEXT_PUBLIC_SHOP_NAME || "Our café";
-
 /** A printable A4 poster for the counter: customers scan the QR code to open today's deals. */
 export default function Poster() {
   // Rendered only in the browser (see page.tsx), so the site's own address is available here.
-  const [url, setUrl] = useState(() => `${window.location.origin}/deals`);
+  const [url, setUrl] = useState("");
+  const [shopName, setShopName] = useState("");
+
+  useEffect(() => {
+    fetch("/api/auth/me")
+      .then((res) => (res.ok ? res.json() : Promise.reject()))
+      .then((me) => {
+        setShopName(me.shop.name);
+        setUrl((u) => u || `${window.location.origin}/s/${me.shop.slug}`);
+      })
+      .catch(() => {});
+  }, []);
   const [svg, setSvg] = useState("");
 
   useEffect(() => {
@@ -43,7 +52,7 @@ export default function Poster() {
 
       <div className="mt-8 flex aspect-[210/297] flex-col items-center justify-between rounded-2xl border border-stone-200 bg-white p-[8%] text-center print:mt-0 print:h-[273mm] print:rounded-none print:border-0">
         <div>
-          <div className="text-[clamp(14px,2.2vw,22px)] font-medium uppercase tracking-widest text-emerald-700 print:text-[22px]">{SHOP}</div>
+          <div className="text-[clamp(14px,2.2vw,22px)] font-medium uppercase tracking-widest text-emerald-700 print:text-[22px]">{shopName}</div>
           <h2 className="mt-3 text-[clamp(32px,6vw,64px)] font-bold leading-tight tracking-tight print:text-[64px]">Rescue deals today</h2>
           <p className="mx-auto mt-3 max-w-md text-[clamp(14px,2.2vw,22px)] text-stone-600 print:text-[22px]">
             Fresh food at up to 50% off, so nothing goes to waste.
