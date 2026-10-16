@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { api } from "@/lib/client";
-import type { BundleSuggestion } from "@/lib/bundles";
+import { notYetLive, type BundleSuggestion } from "@/lib/bundles";
 import { expiryLabel, rupees, type Bundle } from "@/lib/schema";
 
 type LiveBundle = Bundle & { available: number };
@@ -161,10 +161,9 @@ export default function BundlesPage() {
     load();
   }, [load]);
 
-  // Hide suggestions that are already live (same items), so publishing one removes it from the list.
-  const key = (items: { batchId: string }[]) => items.map((i) => i.batchId).sort().join();
-  const liveKeys = new Set(live.map((b) => key(b.items)));
-  const fresh = suggestions?.filter((s) => !liveKeys.has(key(s.items)));
+  // The API already leaves out suggestions that are on sale; this also hides one the moment it's published.
+  const fresh = suggestions && notYetLive(suggestions, live);
+  const key = (items: { batchId: string }[]) => items.map((i) => i.batchId).join();
 
   return (
     <div className="mx-auto max-w-5xl px-5 py-8">

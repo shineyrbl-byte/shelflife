@@ -106,3 +106,11 @@ export function suggestBundles(stock: Batch[], from = today()): BundleSuggestion
   }
   return out;
 }
+
+const itemsKey = (items: { batchId: string }[]) => items.map((i) => i.batchId).sort().join();
+
+/** Drops suggestions with exactly the same items as a bundle already on sale. */
+export function notYetLive(suggestions: BundleSuggestion[], live: { items: { batchId: string }[] }[]) {
+  const liveKeys = new Set(live.map((b) => itemsKey(b.items)));
+  return suggestions.filter((s) => !liveKeys.has(itemsKey(s.items)));
+}
