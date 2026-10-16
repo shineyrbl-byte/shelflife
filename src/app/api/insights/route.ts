@@ -8,11 +8,11 @@ export async function GET(req: Request) {
   await connection();
   const days = Math.min(Math.max(Number(new URL(req.url).searchParams.get("days")) || 28, 7), 365);
   const since = today(new Date(Date.now() - (days - 1) * 86400000));
-  const history = listBatchesSince(since);
+  const history = await listBatchesSince(since);
   return Response.json({
     days,
     items: itemInsights(history),
     tips: orderTips(history),
-    weekdays: wasteByWeekday(listWasteSince(since)),
+    weekdays: wasteByWeekday(await listWasteSince(since)),
   });
 }

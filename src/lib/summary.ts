@@ -13,18 +13,15 @@ function section(icon: string, label: string, batches: Batch[], suffix = "") {
   return `${icon} ${label} (${rupees(costOf(batches))} at cost${suffix}):\n${batches.map((b) => `  • ${qty(b)}`).join("\n")}`;
 }
 
-export function buildSummary(appUrl: string, now = new Date()) {
+export async function buildSummary(appUrl: string, now = new Date()) {
   const day = today(now);
-  const stock = listStock();
+  const since = today(new Date(now.getTime() - 6 * 86400000));
+  const [stock, live, totals, rescued] = await Promise.all([listStock(), listActiveBundles(), outcomeTotals(since), bundleRevenue(since)]);
   const expiringToday = stock.filter((b) => freshness(b.expiresOn, day) === "today");
   const tomorrow = stock.filter((b) => daysLeft(b.expiresOn, day) === 1);
   const expired = stock.filter((b) => freshness(b.expiresOn, day) === "expired");
-  const live = listActiveBundles();
   const suggestions = suggestBundles(stock, day);
 
-  const since = today(new Date(now.getTime() - 6 * 86400000));
-  const totals = outcomeTotals(since);
-  const rescued = bundleRevenue(since);
   const atEnd = totals.wasted.quantity + totals.rescued.quantity;
   const rate = atEnd ? `, rescue rate ${Math.round((totals.rescued.quantity / atEnd) * 100)}%` : "";
 

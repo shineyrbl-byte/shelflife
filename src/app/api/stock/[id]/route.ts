@@ -6,7 +6,7 @@ type Ctx = { params: Promise<{ id: string }> };
 
 /** Corrects a batch (typo, price, expiry, miscounted quantity). Logged history stays valid. */
 export async function PATCH(req: Request, { params }: Ctx) {
-  const batch = getBatch((await params).id);
+  const batch = await getBatch((await params).id);
   if (!batch) return notFound();
   const body = await readBody(req, BatchInputSchema.partial());
   if (body instanceof Response) return body;
@@ -21,14 +21,14 @@ export async function PATCH(req: Request, { params }: Ctx) {
   }
   const parsed = BatchInputSchema.safeParse(next);
   if (!parsed.success) return Response.json({ error: "Invalid values." }, { status: 400 });
-  updateBatch(batch.id, parsed.data);
-  return Response.json(getBatch(batch.id));
+  await updateBatch(batch.id, parsed.data);
+  return Response.json(await getBatch(batch.id));
 }
 
 /** Removes a batch entered by mistake, along with its history. */
 export async function DELETE(_req: Request, { params }: Ctx) {
   const { id } = await params;
-  if (!getBatch(id)) return notFound();
-  deleteBatch(id);
+  if (!(await getBatch(id))) return notFound();
+  await deleteBatch(id);
   return new Response(null, { status: 204 });
 }

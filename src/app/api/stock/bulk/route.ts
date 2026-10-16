@@ -9,6 +9,10 @@ const Body = z.object({ items: z.array(BatchInputSchema).min(1).max(100) });
 export async function POST(req: Request) {
   const body = await readBody(req, Body);
   if (body instanceof Response) return body;
-  const ids = transaction(() => body.items.map((item) => insertBatch(item)));
+  const ids = await transaction(async (tx) => {
+    const out: string[] = [];
+    for (const item of body.items) out.push(await insertBatch(item, undefined, tx));
+    return out;
+  });
   return Response.json({ ids }, { status: 201 });
 }
