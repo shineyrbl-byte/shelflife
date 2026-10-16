@@ -27,6 +27,7 @@ Each café signs up with its shop name, email and password, and only ever sees i
 - Passwords are hashed with scrypt (Node's built-in crypto); no third-party auth service.
 - Sessions are random tokens in an httpOnly cookie, valid for 30 days; the database stores only their SHA-256 hash.
 - `src/proxy.ts` sends logged-out visitors on staff pages to `/login`; each API route checks the session itself.
+- **Staff logins**: the owner invites staff from **Settings → Team** with a one-time link (valid 7 days, only its hash stored), shared on WhatsApp. Staff set their own name, email and password at `/join`. Staff can use Stock, Bundles (including reservations) and Poster; money reports, Insights, Settings, the team list and the daily summary are owner-only, enforced by `requireOwner()` in each API route. Removing a staff member logs them out everywhere.
 - Each shop gets a public customer page at `/s/<shop-name>`, e.g. `/s/cafe-mogra`.
 - Data created before accounts existed is given to the first shop that signs up, so an existing local setup keeps its data.
 

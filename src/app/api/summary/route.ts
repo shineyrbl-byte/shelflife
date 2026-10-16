@@ -16,7 +16,8 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const appUrl = process.env.APP_URL || url.origin;
   const session = await currentSession();
-  if (session) return Response.json(await buildSummary(session.shop, appUrl));
+  if (session?.user.role === "owner") return Response.json(await buildSummary(session.shop, appUrl));
+  if (session) return Response.json({ error: "Only the shop owner can do this." }, { status: 403 });
 
   const secret = process.env.CRON_SECRET;
   const given = req.headers.get("authorization")?.replace(/^Bearer /, "") ?? "";
