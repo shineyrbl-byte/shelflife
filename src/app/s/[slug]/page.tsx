@@ -97,6 +97,7 @@ function Deals() {
   const [deals, setDeals] = useState<Deal[] | null>(null);
   const [shopName, setShopName] = useState("");
   const [shareUrl, setShareUrl] = useState("");
+  const [kgRescued, setKgRescued] = useState(0);
   const [missing, setMissing] = useState(false);
   const [mine, setMine] = useState<MyReservation[]>([]);
 
@@ -109,6 +110,7 @@ function Deals() {
           setMine(loadMine(slug));
           setShopName(data.shop.name);
           setShareUrl(data.shop.publicUrl);
+          setKgRescued(data.shop.kgRescued ?? 0);
           setDeals(data.deals);
         })
         .catch(() => setDeals((d) => d ?? [])),
@@ -162,6 +164,12 @@ function Deals() {
       <p className="mt-2 text-stone-600">
         These are fresh items close to their best-before date, bundled at a discount so nothing goes in the bin. Reserve one and pick it up within the hour, or just show this page at the counter.
       </p>
+
+      {kgRescued >= 1 && (
+        <p className="mt-3 text-sm font-medium text-emerald-800">
+          🌱 Thanks to customers like you, {shopName} has rescued about {Math.round(kgRescued)} kg of food so far.
+        </p>
+      )}
 
       {mine.length > 0 && (
         <section className="mt-6 space-y-3">
