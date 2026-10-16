@@ -40,6 +40,7 @@ Each café signs up with its shop name, email and password, and only ever sees i
 | `/dashboard` | Owner | Stock value at risk now, expired stock to log, the last 7/30 days (money rescued, waste at cost, rescue rate), and today's summary to send on WhatsApp |
 | `/stock` | Staff | Scan a supplier bill or add deliveries by hand, with expiry dates; stock grouped by urgency; log units as sold, donated (before expiry) or wasted |
 | `/bundles` | Staff | Customer reservations to hand over (*Picked up* / *Cancel*); suggested rescue bundles to publish (price editable); live bundles with a *Sold 1* button for the till |
+| `/orders` | Owner | Tomorrow's order per supplier (suggested from ordering tips or the usual order), sent as a WhatsApp message |
 | `/insights` | Owner | Ordering tips ("order 9 croissants, not 12"), waste by weekday, and where each item's stock goes |
 | `/poster` | Staff | Printable A4 poster with a QR code to the shop's deals page |
 | `/settings` | Owner | Shop name, the customer page link, and the ntfy topic for the morning summary |
@@ -85,6 +86,10 @@ On a shop's deals page, customers tap **Reserve for pickup**, enter a first name
 - Only a first name is stored: no phone number or email.
 - Customers can cancel their own reservation; that needs its id and code, which only their browser has.
 - Availability is checked and the hold created in one transaction, so two customers can't both get the last one.
+
+### Supplier orders
+
+**Orders** lists every item stocked in the last 4 weeks with a suggested quantity for tomorrow: the ordering tip when there is one (e.g. 9 croissants instead of 12), otherwise the usual order. The owner adds suppliers with their WhatsApp numbers (Indian numbers without +91 are fine) and picks a supplier for each item once; it's remembered. Each supplier then gets an editable message (*Hi Rahul, this is Café Blanc. Please send for Sun, 18 Oct: • 9 pcs Croissant…*) and a **Send on WhatsApp** button (a `wa.me` link, no WhatsApp API or account needed).
 
 ### Barcode scanning
 

@@ -113,6 +113,20 @@ const SCHEMA = `
     expires_at TEXT NOT NULL
   );
   CREATE INDEX IF NOT EXISTS reservations_shop ON reservations(shop_id, status, expires_at);
+  -- Who supplies what: suppliers, and which supplier each item (by lower-cased name) is ordered from.
+  CREATE TABLE IF NOT EXISTS suppliers (
+    id TEXT PRIMARY KEY,
+    shop_id TEXT NOT NULL REFERENCES shops(id),
+    name TEXT NOT NULL,
+    phone TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
+  CREATE TABLE IF NOT EXISTS supplier_items (
+    shop_id TEXT NOT NULL REFERENCES shops(id),
+    item_key TEXT NOT NULL,
+    supplier_id TEXT NOT NULL REFERENCES suppliers(id),
+    PRIMARY KEY (shop_id, item_key)
+  );
   CREATE TABLE IF NOT EXISTS bundle_sales (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     bundle_id TEXT NOT NULL REFERENCES bundles(id),
@@ -770,5 +784,48 @@ export async function listBundleSales(shopId: string, fromIso: string, toIso: st
     [shopId, fromIso, toIso],
   );
   return rows.map((r) => ({ at: r.at as string, title: r.title as string, price: r.price as number, originalPrice: r.original_price as number }));
+}
+
+// ---- Suppliers ----
+
+export type Supplier = { id: string; name: string; phone: string };
+
+export async function listSuppliers(shopId: string): Promise<Supplier[]> {
+  const rows = await all("SELECT id, name, phone FROM suppliers WHERE shop_id = ? ORDER BY name", [shopId]);
+  return rows.map((r) => ({ id: r.id as string, name: r.name as string, phone: r.phone as string }));
+}
+
+export async function insertSupplier(shopId: string, name: string, phone: string): Promise<Supplier> {
+  const s = { id: newId(), name, phone };
+  await run("INSERT INTO suppliers (id, shop_id, name, phone, created_at) VALUES (?, ?, ?, ?, ?)", [s.id, shopId, name, phone, new Date().toISOString()]);
+  return s;
+}
+
+export async function deleteSupplier(shopId: string, id: string) {
+  await transaction(async (tx) => {
+    await run("DELETE FROM supplier_items WHERE shop_id = ? AND supplier_id = ?", [shopId, id], tx);
+    await run("DELETE FROM suppliers WHERE shop_id = ? AND id = ?", [shopId, id], tx);
+  });
+}
+
+/** Item key → supplier id for the shop. */
+export async function supplierAssignments(shopId: string): Promise<Map<string, string>> {
+  const rows = await all("SELECT item_key, supplier_id FROM supplier_items WHERE shop_id = ?", [shopId]);
+  return new Map(rows.map((r) => [r.item_key as string, r.supplier_id as string]));
+}
+
+/** Remembers which supplier an item is ordered from (null forgets it). The supplier must be the shop's own. */
+export async function assignSupplier(shopId: string, itemKey: string, supplierId: string | null): Promise<boolean> {
+  if (!supplierId) {
+    await run("DELETE FROM supplier_items WHERE shop_id = ? AND item_key = ?", [shopId, itemKey]);
+    return true;
+  }
+  if (!(await one("SELECT 1 FROM suppliers WHERE id = ? AND shop_id = ?", [supplierId, shopId]))) return false;
+  await run(
+    `INSERT INTO supplier_items (shop_id, item_key, supplier_id) VALUES (?, ?, ?)
+     ON CONFLICT (shop_id, item_key) DO UPDATE SET supplier_id = excluded.supplier_id`,
+    [shopId, itemKey, supplierId],
+  );
+  return true;
 }
 

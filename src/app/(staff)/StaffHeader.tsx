@@ -12,6 +12,7 @@ const NAV: { href: string; label: Key; ownerOnly?: boolean }[] = [
   { href: "/stock", label: "nav.stock" },
   { href: "/bundles", label: "nav.bundles" },
   { href: "/insights", label: "nav.insights", ownerOnly: true },
+  { href: "/orders", label: "nav.orders", ownerOnly: true },
   { href: "/poster", label: "nav.poster" },
   { href: "/settings", label: "nav.settings", ownerOnly: true },
 ];
