@@ -12,6 +12,10 @@ function connect(): Client {
   if (process.env.TURSO_DATABASE_URL) {
     return createClient({ url: process.env.TURSO_DATABASE_URL, authToken: process.env.TURSO_AUTH_TOKEN });
   }
+  if (process.env.VERCEL) {
+    // Vercel's file system is read-only and wiped on every deploy, so a local file can't work there.
+    throw new Error("ShelfLife needs a hosted database on Vercel: set TURSO_DATABASE_URL and TURSO_AUTH_TOKEN in the project's Environment Variables.");
+  }
   const dir = path.join(process.cwd(), "data");
   mkdirSync(dir, { recursive: true });
   return createClient({ url: `file:${path.join(dir, "shelflife.db")}` });

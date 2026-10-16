@@ -18,6 +18,8 @@ Optional: copy `.env.example` to `.env.local` and set:
 
 Everything else works without any keys, on a local SQLite file.
 
+**Putting it online:** see [DEPLOY.md](DEPLOY.md) (Turso + Vercel, both free, about 15 minutes).
+
 ## Accounts and shops
 
 Each café signs up with its shop name, email and password, and only ever sees its own stock, bundles and reports. Every database query is filtered by the logged-in shop, and the API answers *not found* for another shop's ids.
