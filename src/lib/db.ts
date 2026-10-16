@@ -462,10 +462,10 @@ export type BatchHistory = Batch & Record<Outcome, number>;
 export async function listBatchesSince(shopId: string, since: string): Promise<BatchHistory[]> {
   const sum = (o: Outcome) => `COALESCE((SELECT SUM(e.quantity) FROM events e WHERE e.batch_id = b.id AND e.outcome = '${o}'), 0) AS ${o}`;
   const rows = await all(
-    `SELECT *, ${sum("sold")}, ${sum("rescued")}, ${sum("wasted")} FROM (${BATCH_SELECT} WHERE b.shop_id = ?) b WHERE b.added_on >= ? ORDER BY b.added_on`,
+    `SELECT *, ${sum("sold")}, ${sum("rescued")}, ${sum("wasted")}, ${sum("donated")} FROM (${BATCH_SELECT} WHERE b.shop_id = ?) b WHERE b.added_on >= ? ORDER BY b.added_on`,
     [shopId, since],
   );
-  return rows.map((r) => ({ ...toBatch(r), sold: r.sold as number, rescued: r.rescued as number, wasted: r.wasted as number }));
+  return rows.map((r) => ({ ...toBatch(r), sold: r.sold as number, rescued: r.rescued as number, wasted: r.wasted as number, donated: r.donated as number }));
 }
 
 /** Waste events since a date, with their value at cost, for the by-weekday breakdown. */
@@ -512,6 +512,7 @@ export async function outcomeTotals(shopId: string, since: string): Promise<Outc
     sold: { quantity: 0, cost: 0, revenue: 0 },
     wasted: { quantity: 0, cost: 0, revenue: 0 },
     rescued: { quantity: 0, cost: 0, revenue: 0 },
+    donated: { quantity: 0, cost: 0, revenue: 0 },
   };
   for (const r of rows) {
     totals[r.outcome as Outcome] = { quantity: r.qty as number, cost: r.cost as number, revenue: r.revenue as number };
@@ -666,7 +667,7 @@ export async function setReservationStatus(shopId: string, id: string, status: R
 // ---- Impact ----
 
 /**
- * Rescued quantities grouped by unit and category, plus bundle revenue and sales, since a date.
+ * Rescued (sold in bundles) and donated quantities grouped by unit and category, plus bundle revenue and sales, since a date.
  * shopId null = all shops together (for the public homepage counter).
  */
 export async function rescueTotals(shopId: string | null, since = "0000") {
@@ -674,8 +675,8 @@ export async function rescueTotals(shopId: string | null, since = "0000") {
   const args = (extra: InValue[]) => (shopId ? [...extra, shopId] : extra);
   const [rows, money] = await Promise.all([
     all(
-      `SELECT b.unit, b.category, SUM(e.quantity) AS qty FROM events e JOIN batches b ON b.id = e.batch_id
-       WHERE e.outcome = 'rescued' AND e.at >= ? ${shopFilter} GROUP BY b.unit, b.category`,
+      `SELECT e.outcome, b.unit, b.category, SUM(e.quantity) AS qty FROM events e JOIN batches b ON b.id = e.batch_id
+       WHERE e.outcome IN ('rescued', 'donated') AND e.at >= ? ${shopFilter} GROUP BY e.outcome, b.unit, b.category`,
       args([since]),
     ),
     one(
@@ -685,7 +686,7 @@ export async function rescueTotals(shopId: string | null, since = "0000") {
     ),
   ]);
   return {
-    rows: rows.map((r) => ({ unit: r.unit as Unit, category: r.category as Category, quantity: r.qty as number })),
+    rows: rows.map((r) => ({ outcome: r.outcome as "rescued" | "donated", unit: r.unit as Unit, category: r.category as Category, quantity: r.qty as number })),
     money: (money?.total as number) ?? 0,
     bundlesSold: (money?.n as number) ?? 0,
   };

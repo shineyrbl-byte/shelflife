@@ -25,9 +25,20 @@ export function weightKg(unit: Unit, category: Category, quantity: number) {
   return quantity * KG_PER_PIECE[category];
 }
 
-export type Impact = { kgRescued: number; co2Kg: number; moneyRecovered: number; bundlesSold: number };
+/** kgRescued = all food kept out of the bin (sold in bundles or donated); kgDonated is the donated part. */
+export type Impact = { kgRescued: number; kgDonated: number; co2Kg: number; moneyRecovered: number; bundlesSold: number };
 
-export function impactOf(rows: { unit: Unit; category: Category; quantity: number }[], money: number, bundlesSold: number): Impact {
-  const kg = rows.reduce((s, r) => s + weightKg(r.unit, r.category, r.quantity), 0);
-  return { kgRescued: Math.round(kg * 10) / 10, co2Kg: Math.round(kg * CO2_PER_KG_FOOD), moneyRecovered: Math.round(money), bundlesSold };
+type RescueRow = { outcome?: "rescued" | "donated"; unit: Unit; category: Category; quantity: number };
+
+export function impactOf(rows: RescueRow[], money: number, bundlesSold: number): Impact {
+  const kgOf = (rs: RescueRow[]) => rs.reduce((s, r) => s + weightKg(r.unit, r.category, r.quantity), 0);
+  const kg = kgOf(rows);
+  const round1 = (n: number) => Math.round(n * 10) / 10;
+  return {
+    kgRescued: round1(kg),
+    kgDonated: round1(kgOf(rows.filter((r) => r.outcome === "donated"))),
+    co2Kg: Math.round(kg * CO2_PER_KG_FOOD),
+    moneyRecovered: Math.round(money),
+    bundlesSold,
+  };
 }

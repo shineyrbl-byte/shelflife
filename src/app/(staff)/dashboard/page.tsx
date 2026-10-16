@@ -11,6 +11,7 @@ type Report = {
   sold: Totals;
   wasted: Totals;
   rescued: Totals;
+  donated: Totals;
   atRisk: { batches: number; cost: number };
   expired: { batches: number; cost: number };
 };
@@ -25,7 +26,7 @@ function Card({ label, value, note, tone = "" }: { label: string; value: string;
   );
 }
 
-type Impact = { kgRescued: number; co2Kg: number; moneyRecovered: number; bundlesSold: number };
+type Impact = { kgRescued: number; kgDonated: number; co2Kg: number; moneyRecovered: number; bundlesSold: number };
 
 const kg = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(1)} t` : `${n.toLocaleString("en-IN")} kg`);
 
@@ -42,7 +43,7 @@ function ImpactSection() {
   const { month, allTime } = data;
   const shareText =
     `🌱 Since we started using ShelfLife, ${data.shopName} has rescued ${kg(allTime.kgRescued)} of food from the bin ` +
-    `by selling ${allTime.bundlesSold} rescue bundles. That's about ${kg(allTime.co2Kg)} of CO₂ avoided. ` +
+    `${allTime.kgDonated ? `(${kg(allTime.kgDonated)} of it donated) ` : ""}by selling rescue bundles${allTime.kgDonated ? " and donating" : ""}. That's about ${kg(allTime.co2Kg)} of CO₂ avoided. ` +
     `Ask about today's rescue deals! 🥐`;
 
   return (
@@ -58,12 +59,12 @@ function ImpactSection() {
           Share it
         </a>
       </div>
-      {allTime.bundlesSold === 0 ? (
-        <p className="mt-2 text-sm text-stone-600">Sell your first rescue bundle and your impact shows up here.</p>
+      {allTime.kgRescued === 0 ? (
+        <p className="mt-2 text-sm text-stone-600">Sell your first rescue bundle (or donate food before it expires) and your impact shows up here.</p>
       ) : (
         <div className="mt-4 grid gap-4 sm:grid-cols-3">
           {[
-            ["Food rescued", kg(allTime.kgRescued), `${kg(month.kgRescued)} this month`],
+            ["Food rescued", kg(allTime.kgRescued), `${kg(month.kgRescued)} this month${allTime.kgDonated ? ` · ${kg(allTime.kgDonated)} donated` : ""}`],
             ["CO₂ avoided", kg(allTime.co2Kg), `${kg(month.co2Kg)} this month`],
             ["Money recovered", rupees(allTime.moneyRecovered), `${allTime.bundlesSold} bundles sold`],
           ].map(([label, value, note]) => (
@@ -130,9 +131,10 @@ export default function Dashboard() {
     api<Report>(`/api/report?days=${days}`).then(setR, () => setR(null));
   }, [days]);
 
-  // Of everything that reached its end of life (wasted or rescued), how much was saved.
-  const atEnd = r ? r.wasted.quantity + r.rescued.quantity : 0;
-  const rescueRate = r && atEnd ? Math.round((r.rescued.quantity / atEnd) * 100) : null;
+  // Of everything that reached its end of life (wasted, rescued or donated), how much was kept out of the bin.
+  const saved = r ? r.rescued.quantity + r.donated.quantity : 0;
+  const atEnd = r ? r.wasted.quantity + saved : 0;
+  const rescueRate = r && atEnd ? Math.round((saved / atEnd) * 100) : null;
 
   return (
     <div className="mx-auto max-w-5xl px-5 py-8">
@@ -191,14 +193,15 @@ export default function Dashboard() {
         />
         <Card label="Wasted" value={r ? rupees(r.wasted.cost) : "–"} note="Thrown away, valued at cost" />
         <Card
-          label="Rescue rate"
+          label="Saved from the bin"
           value={rescueRate === null ? "–" : `${rescueRate}%`}
-          note="Share of end-of-life stock sold in bundles instead of binned"
+          note="Share of near-expiry stock sold in bundles or donated instead of binned"
         />
       </div>
       {r && (
         <p className="mt-4 text-sm text-stone-500">
           Regular sales: {rupees(r.sold.revenue)} from {r.sold.quantity} units logged as sold.
+          {r.donated.quantity > 0 && ` Donated: ${r.donated.quantity} units (${rupees(r.donated.cost)} at cost).`}
         </p>
       )}
 

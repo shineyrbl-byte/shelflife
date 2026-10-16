@@ -20,7 +20,7 @@ export async function PATCH(req: Request, { params }: Ctx) {
     return Response.json({ error: "Can't change the unit after sales or waste were logged." }, { status: 409 });
   }
   if (next.quantity < logged - 1e-9) {
-    return Response.json({ error: `Quantity can't be below the ${+logged.toFixed(2)} ${batch.unit} already sold, rescued or wasted.` }, { status: 409 });
+    return Response.json({ error: `Quantity can't be below the ${+logged.toFixed(2)} ${batch.unit} already sold, rescued, donated or wasted.` }, { status: 409 });
   }
   const parsed = BatchInputSchema.safeParse(next);
   if (!parsed.success) return Response.json({ error: "Invalid values." }, { status: 400 });

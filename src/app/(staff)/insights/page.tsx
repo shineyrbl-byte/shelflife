@@ -53,7 +53,7 @@ function ItemTable({ items }: { items: ItemInsight[] }) {
             <tr>
               <th className="px-5 py-2">Item</th>
               <th className="px-3 py-2 text-right">Ordered</th>
-              <th className="px-3 py-2 w-56">Full price · bundles · bin</th>
+              <th className="px-3 py-2 w-56">Full price · bundles · donated · bin</th>
               <th className="px-3 py-2 text-right">Wasted</th>
               <th className="px-5 py-2 text-right">Waste cost</th>
             </tr>
@@ -69,9 +69,10 @@ function ItemTable({ items }: { items: ItemInsight[] }) {
                   </td>
                   <td className="px-3 py-2.5 text-right tabular-nums">{it.ordered} {it.unit}</td>
                   <td className="px-3 py-2.5">
-                    <div className="flex h-2.5 overflow-hidden rounded-full bg-stone-100" title={`${it.sold} sold · ${it.rescued} rescued · ${it.wasted} wasted`}>
+                    <div className="flex h-2.5 overflow-hidden rounded-full bg-stone-100" title={`${it.sold} sold · ${it.rescued} rescued · ${it.donated} donated · ${it.wasted} wasted`}>
                       <div className="bg-emerald-500" style={{ width: pct(it.sold) }} />
                       <div className="bg-amber-400" style={{ width: pct(it.rescued) }} />
+                      <div className="bg-sky-400" style={{ width: pct(it.donated) }} />
                       <div className="bg-red-500" style={{ width: pct(it.wasted) }} />
                     </div>
                   </td>
@@ -86,6 +87,7 @@ function ItemTable({ items }: { items: ItemInsight[] }) {
       <div className="flex gap-4 px-5 py-3 text-xs text-stone-500">
         <span><span className="mr-1 inline-block h-2 w-2 rounded-full bg-emerald-500" />Sold at full price</span>
         <span><span className="mr-1 inline-block h-2 w-2 rounded-full bg-amber-400" />Rescued in bundles</span>
+        <span><span className="mr-1 inline-block h-2 w-2 rounded-full bg-sky-400" />Donated</span>
         <span><span className="mr-1 inline-block h-2 w-2 rounded-full bg-red-500" />Wasted</span>
       </div>
     </section>

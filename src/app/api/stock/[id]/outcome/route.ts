@@ -2,11 +2,12 @@ import { requireShop } from "@/lib/auth";
 import { z } from "zod";
 import { getBatch, logOutcome } from "@/lib/db";
 import { notFound, readBody } from "@/lib/http";
+import { freshness } from "@/lib/schema";
 
 type Ctx = { params: Promise<{ id: string }> };
 
 // "rescued" is only logged by selling a bundle, so it isn't accepted here.
-const Body = z.object({ outcome: z.enum(["sold", "wasted"]), quantity: z.number().positive() });
+const Body = z.object({ outcome: z.enum(["sold", "wasted", "donated"]), quantity: z.number().positive() });
 
 export async function POST(req: Request, { params }: Ctx) {
   const shop = await requireShop();
@@ -15,6 +16,9 @@ export async function POST(req: Request, { params }: Ctx) {
   if (!batch) return notFound();
   const body = await readBody(req, Body);
   if (body instanceof Response) return body;
+  if (body.outcome === "donated" && freshness(batch.expiresOn) === "expired") {
+    return Response.json({ error: "Expired food can't be donated. Log it as wasted." }, { status: 409 });
+  }
   if (body.quantity > batch.remaining + 1e-9) {
     return Response.json({ error: `Only ${batch.remaining} ${batch.unit} left.` }, { status: 409 });
   }
