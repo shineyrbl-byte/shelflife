@@ -112,7 +112,65 @@ function AddBatchForm({ onAdded }: { onAdded: () => void }) {
   );
 }
 
+function EditLine({ b, onDone }: { b: StockRow; onDone: (saved: boolean) => void }) {
+  const [f, setF] = useState({
+    name: b.name,
+    category: b.category,
+    unit: b.unit,
+    quantity: String(b.quantity),
+    unitCost: String(b.unitCost),
+    unitPrice: String(b.unitPrice),
+    expiresOn: b.expiresOn,
+  });
+  const [error, setError] = useState("");
+  const hasHistory = b.remaining !== b.quantity;
+  const set = (k: keyof typeof f) => (e: { target: { value: string } }) => setF({ ...f, [k]: e.target.value });
+
+  async function save() {
+    setError("");
+    const body = { ...f, name: f.name.trim(), quantity: Number(f.quantity), unitCost: Number(f.unitCost), unitPrice: Number(f.unitPrice) };
+    if (body.unitPrice < body.unitCost) return setError("Selling price is below cost. Double-check the prices.");
+    try {
+      await api(`/api/stock/${b.id}`, { method: "PATCH", body: JSON.stringify(body) });
+      onDone(true);
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  }
+
+  const input = "rounded-lg border border-stone-300 bg-white px-2 py-1.5 text-sm focus:border-emerald-500 focus:outline-none";
+  return (
+    <li className="space-y-2 bg-white/70 px-4 py-3">
+      <div className="flex flex-wrap items-end gap-2 text-xs text-stone-500">
+        <label className="flex-1 min-w-40">Item<input className={`${input} w-full`} value={f.name} onChange={set("name")} /></label>
+        <label>
+          Category
+          <select className={`${input} block`} value={f.category} onChange={set("category")}>
+            {CATEGORIES.map((c) => <option key={c}>{c}</option>)}
+          </select>
+        </label>
+        <label>
+          {hasHistory ? `Qty received` : "Quantity"}
+          <div className="flex gap-1">
+            <input className={`${input} w-16`} inputMode="decimal" value={f.quantity} onChange={set("quantity")} />
+            <select className={input} value={f.unit} onChange={set("unit")} disabled={hasHistory} title={hasHistory ? "Unit is fixed once sales or waste are logged" : undefined}>
+              {UNITS.map((u) => <option key={u}>{u}</option>)}
+            </select>
+          </div>
+        </label>
+        <label>Cost ₹<input className={`${input} block w-20`} inputMode="decimal" value={f.unitCost} onChange={set("unitCost")} /></label>
+        <label>Price ₹<input className={`${input} block w-20`} inputMode="decimal" value={f.unitPrice} onChange={set("unitPrice")} /></label>
+        <label>Expires<input type="date" className={`${input} block`} value={f.expiresOn} onChange={set("expiresOn")} /></label>
+        <button onClick={save} className="rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-700">Save</button>
+        <button onClick={() => onDone(false)} className="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm hover:bg-stone-50">Cancel</button>
+      </div>
+      {error && <p className="text-xs text-red-600">{error}</p>}
+    </li>
+  );
+}
+
 function StockLine({ b, onChange }: { b: StockRow; onChange: () => void }) {
+  const [editing, setEditing] = useState(false);
   const [qty, setQty] = useState("");
   const [error, setError] = useState("");
   const amount = qty === "" ? b.remaining : Number(qty);
@@ -131,6 +189,18 @@ function StockLine({ b, onChange }: { b: StockRow; onChange: () => void }) {
   async function remove() {
     if (b.remaining !== b.quantity) return setError("This batch has history, so log it as sold or wasted instead.");
     await api(`/api/stock/${b.id}`, { method: "DELETE" }).then(onChange, (err) => setError(err.message));
+  }
+
+  if (editing) {
+    return (
+      <EditLine
+        b={b}
+        onDone={(saved) => {
+          setEditing(false);
+          if (saved) onChange();
+        }}
+      />
+    );
   }
 
   return (
@@ -158,7 +228,8 @@ function StockLine({ b, onChange }: { b: StockRow; onChange: () => void }) {
           <button onClick={() => log("sold")} className="rounded-lg border border-stone-300 px-2.5 py-1.5 text-sm hover:bg-stone-50">Sold</button>
         )}
         <button onClick={() => log("wasted")} className="rounded-lg border border-red-200 px-2.5 py-1.5 text-sm text-red-700 hover:bg-red-50">Wasted</button>
-        <button onClick={remove} title="Delete (entered by mistake)" className="px-1.5 text-stone-400 hover:text-stone-700">✕</button>
+        <button onClick={() => setEditing(true)} title="Edit" className="px-1 text-stone-400 hover:text-stone-700">✎</button>
+        <button onClick={remove} title="Delete (entered by mistake)" className="px-1 text-stone-400 hover:text-stone-700">✕</button>
       </div>
       {error && <p className="w-full text-xs text-red-600">{error}</p>}
     </li>
