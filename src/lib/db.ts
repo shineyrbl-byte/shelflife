@@ -133,6 +133,9 @@ async function migrate(c: Client) {
   // Everyone who signed up before staff logins existed is their shop's owner.
   await addColumn("users", "role", "TEXT NOT NULL DEFAULT 'owner'");
   await addColumn("users", "name", "TEXT NOT NULL DEFAULT ''");
+  // Customer deal alerts: on by default; the public ntfy topic is created when first needed.
+  await addColumn("shops", "deal_alerts", "INTEGER NOT NULL DEFAULT 1");
+  await addColumn("shops", "alerts_topic", "TEXT");
   await c.executeMultiple(`
     CREATE INDEX IF NOT EXISTS batches_shop ON batches(shop_id, expires_on);
     CREATE INDEX IF NOT EXISTS bundles_shop ON bundles(shop_id, status);
@@ -196,7 +199,7 @@ const newId = () => randomUUID().slice(0, 8);
 
 // ---- Shops, users, sessions ----
 
-export type Shop = { id: string; name: string; slug: string; ntfyTopic: string | null };
+export type Shop = { id: string; name: string; slug: string; ntfyTopic: string | null; dealAlerts: boolean; alertsTopic: string | null };
 export type Role = "owner" | "staff";
 export type User = { id: string; shopId: string; email: string; name: string; role: Role };
 
@@ -208,7 +211,14 @@ const toUser = (r: Row, idCol = "id"): User => ({
   role: (r.role as Role) ?? "owner",
 });
 
-const toShop = (r: Row): Shop => ({ id: r.id as string, name: r.name as string, slug: r.slug as string, ntfyTopic: (r.ntfy_topic as string) || null });
+const toShop = (r: Row): Shop => ({
+  id: r.id as string,
+  name: r.name as string,
+  slug: r.slug as string,
+  ntfyTopic: (r.ntfy_topic as string) || null,
+  dealAlerts: r.deal_alerts === undefined || r.deal_alerts === null ? true : Boolean(r.deal_alerts),
+  alertsTopic: (r.alerts_topic as string) || null,
+});
 
 /** "Café Mogra, Goa!" -> "cafe-mogra-goa" */
 const slugify = (name: string) =>
@@ -229,7 +239,7 @@ export async function createShopWithUser(name: string, email: string, passwordHa
     const base = slugify(name);
     let slug = base;
     for (let n = 2; await one("SELECT 1 FROM shops WHERE slug = ?", [slug], tx); n++) slug = `${base}-${n}`;
-    const shop: Shop = { id: newId(), name, slug, ntfyTopic: null };
+    const shop: Shop = { id: newId(), name, slug, ntfyTopic: null, dealAlerts: true, alertsTopic: null };
     const user: User = { id: newId(), shopId: shop.id, email, name: "", role: "owner" };
     const now = new Date().toISOString();
     const isFirst = !(await one("SELECT 1 FROM shops LIMIT 1", [], tx));
@@ -338,9 +348,21 @@ export async function getShopBySlug(slug: string): Promise<Shop | null> {
   return r ? toShop(r) : null;
 }
 
-export async function updateShop(id: string, patch: { name?: string; ntfyTopic?: string | null }) {
+export async function updateShop(id: string, patch: { name?: string; ntfyTopic?: string | null; dealAlerts?: boolean }) {
+  if (patch.dealAlerts !== undefined) await run("UPDATE shops SET deal_alerts = ? WHERE id = ?", [patch.dealAlerts ? 1 : 0, id]);
   if (patch.name !== undefined) await run("UPDATE shops SET name = ? WHERE id = ?", [patch.name, id]);
   if (patch.ntfyTopic !== undefined) await run("UPDATE shops SET ntfy_topic = ? WHERE id = ?", [patch.ntfyTopic, id]);
+}
+
+/**
+ * The shop's public ntfy topic for customer deal alerts, created on first use. The random part
+ * keeps it from clashing with someone else's topic on the shared ntfy.sh server.
+ */
+export async function ensureAlertsTopic(shop: Shop): Promise<string> {
+  if (shop.alertsTopic) return shop.alertsTopic;
+  const topic = `shelflife-${shop.slug.slice(0, 30)}-${randomUUID().slice(0, 8)}`;
+  await run("UPDATE shops SET alerts_topic = ? WHERE id = ? AND alerts_topic IS NULL", [topic, shop.id]);
+  return ((await one("SELECT alerts_topic FROM shops WHERE id = ?", [shop.id]))?.alerts_topic as string) ?? topic;
 }
 
 /** Shops that want the daily summary pushed to their phones. */
