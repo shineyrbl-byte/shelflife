@@ -13,6 +13,7 @@ const dateLabel = (iso: string) => new Date(iso).toLocaleDateString("en-IN", { d
 export default function Team() {
   const [data, setData] = useState<TeamData | null>(null);
   const [link, setLink] = useState("");
+  const [linkFor, setLinkFor] = useState("an invite link");
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState("");
 
@@ -26,6 +27,7 @@ export default function Team() {
     try {
       const r = await api<{ url: string }>("/api/team/invites", { method: "POST" });
       setLink(r.url);
+      setLinkFor("an invite link");
       setCopied(false);
       load();
     } catch (err) {
@@ -36,6 +38,18 @@ export default function Team() {
   async function remove(m: Member) {
     if (!window.confirm(`Remove ${m.name || m.email}? They'll be logged out right away.`)) return;
     await api(`/api/team/${m.id}`, { method: "DELETE" }).then(load, (err) => setError(err.message));
+  }
+
+  async function resetLink(m: Member) {
+    setError("");
+    try {
+      const r = await api<{ url: string }>(`/api/team/${m.id}/reset-link`, { method: "POST" });
+      setLink(r.url);
+      setLinkFor(`a password reset link for ${m.name || m.email}`);
+      setCopied(false);
+    } catch (err) {
+      setError((err as Error).message);
+    }
   }
 
   const revoke = (i: Invite) => api(`/api/team/invites/${encodeURIComponent(i.id)}`, { method: "DELETE" }).then(load, (err) => setError(err.message));
@@ -62,6 +76,11 @@ export default function Team() {
               </div>
             </div>
             {m.role === "staff" && (
+              <button onClick={() => resetLink(m)} className="rounded-lg border border-stone-300 px-2.5 py-1 hover:bg-stone-50">
+                Reset password
+              </button>
+            )}
+            {m.role === "staff" && (
               <button onClick={() => remove(m)} className="rounded-lg border border-red-200 px-2.5 py-1 text-red-700 hover:bg-red-50">
                 Remove
               </button>
@@ -76,7 +95,9 @@ export default function Team() {
         </button>
         {link && (
           <div className="mt-3">
-            <p className="text-sm text-stone-600">Send this link to them. It works once, for 7 days, and won&apos;t be shown again.</p>
+            <p className="text-sm text-stone-600">
+              Here&apos;s {linkFor}. Send it to them: it works once ({linkFor.startsWith("an invite") ? "for 7 days" : "for 24 hours"}) and won&apos;t be shown again.
+            </p>
             <div className="mt-2 flex gap-2">
               <input readOnly value={link} className="w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-xs" onFocus={(e) => e.target.select()} />
               <button
@@ -89,7 +110,7 @@ export default function Team() {
                 {copied ? "Copied ✓" : "Copy"}
               </button>
               <a
-                href={`https://wa.me/?text=${encodeURIComponent(`Join our shop on ShelfLife: ${link}`)}`}
+                href={`https://wa.me/?text=${encodeURIComponent(linkFor.startsWith("an invite") ? `Join our shop on ShelfLife: ${link}` : `Set a new ShelfLife password here: ${link}`)}`}
                 target="_blank"
                 rel="noreferrer"
                 className="shrink-0 rounded-lg bg-[#25D366] px-3 py-2 text-sm font-medium text-white"

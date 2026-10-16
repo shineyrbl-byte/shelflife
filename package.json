@@ -9,7 +9,8 @@
     "lint": "eslint",
     "seed": "node scripts/seed.mjs",
     "summary": "node --env-file-if-exists=.env.local scripts/summary.mjs",
-    "seed:history": "node --env-file-if-exists=.env.local scripts/seed-history.mjs"
+    "seed:history": "node --env-file-if-exists=.env.local scripts/seed-history.mjs",
+    "reset-password": "node --env-file-if-exists=.env.local scripts/reset-password.mjs"
   },
   "dependencies": {
     "@google/genai": "^2.30.0",

@@ -62,6 +62,11 @@ function Form({ mode }: { mode: Mode }) {
             onChange={(e) => setForm({ ...form, password: e.target.value })}
           />
           {mode === "signup" && <span className="text-xs text-stone-400">At least 8 characters</span>}
+          {mode === "login" && (
+            <Link href="/forgot" className="mt-1 block text-right text-xs text-stone-500 underline hover:text-stone-800">
+              Forgot password?
+            </Link>
+          )}
         </label>
         {error && <p className="text-sm text-red-600">{error}</p>}
         <button disabled={busy} className="w-full rounded-lg bg-emerald-600 px-4 py-2.5 font-medium text-white hover:bg-emerald-700 disabled:opacity-50">

@@ -28,6 +28,7 @@ Each café signs up with its shop name, email and password, and only ever sees i
 - Sessions are random tokens in an httpOnly cookie, valid for 30 days; the database stores only their SHA-256 hash.
 - `src/proxy.ts` sends logged-out visitors on staff pages to `/login`; each API route checks the session itself.
 - **Staff logins**: the owner invites staff from **Settings → Team** with a one-time link (valid 7 days, only its hash stored), shared on WhatsApp. Staff set their own name, email and password at `/join`. Staff can use Stock, Bundles (including reservations) and Poster; money reports, Insights, Settings, the team list and the daily summary are owner-only, enforced by `requireOwner()` in each API route. Removing a staff member logs them out everywhere.
+- **Forgot password**: `/forgot` emails a one-time reset link (1 hour; at most 3 per hour per account; same answer whether or not the email exists) when email is set up via [Brevo](https://www.brevo.com) (`BREVO_API_KEY`, `EMAIL_FROM`; free, no domain needed). Owners can also make a 24-hour reset link for any staff member in **Settings → Team**, and whoever runs the site can make one for any account with `npm run reset-password -- --email …`. Setting a new password logs out every other session.
 - Each shop gets a public customer page at `/s/<shop-name>`, e.g. `/s/cafe-mogra`.
 - Data created before accounts existed is given to the first shop that signs up, so an existing local setup keeps its data.
 
