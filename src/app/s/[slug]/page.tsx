@@ -86,6 +86,48 @@ function ReserveForm({ slug, deal, onReserved }: { slug: string; deal: Deal; onR
   );
 }
 
+/** How customers follow the shop: ntfy in the browser or the free ntfy app, no account needed. */
+function DealAlerts({ alerts, shopName }: { alerts: { topic: string; url: string }; shopName: string }) {
+  const [open, setOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
+  if (!open) {
+    return (
+      <button onClick={() => setOpen(true)} className="mt-6 w-full rounded-xl border border-stone-300 bg-white px-4 py-3 font-medium text-stone-800 hover:bg-stone-50">
+        🔔 Get deal alerts
+      </button>
+    );
+  }
+  return (
+    <div className="mt-6 rounded-2xl border border-stone-200 bg-white p-5 text-sm text-stone-600">
+      <div className="font-semibold text-stone-900">🔔 Get a notification when {shopName || "this shop"} posts a new deal</div>
+      <p className="mt-2">Free, no account needed, and you can turn it off any time.</p>
+      <ol className="mt-3 list-decimal space-y-2 pl-5">
+        <li>
+          <b>On this phone or computer:</b>{" "}
+          <a href={alerts.url} target="_blank" rel="noreferrer" className="text-emerald-700 underline">
+            open the alerts page
+          </a>{" "}
+          and tap <b>Subscribe</b>, then allow notifications.
+        </li>
+        <li>
+          <b>Or with the ntfy app</b> (App Store / Play Store): tap <b>+</b> and subscribe to{" "}
+          <button
+            onClick={() => {
+              navigator.clipboard.writeText(alerts.topic);
+              setCopied(true);
+            }}
+            className="rounded bg-stone-100 px-1.5 py-0.5 font-mono text-xs text-stone-800"
+            title="Copy"
+          >
+            {alerts.topic}
+          </button>
+          {copied && <span className="ml-1 text-emerald-700">copied ✓</span>}
+        </li>
+      </ol>
+    </div>
+  );
+}
+
 function whatsappText(shopName: string, deals: Deal[], url: string) {
   const lines = deals.map((d) => `• ${d.title}: ${rupees(d.price)} (was ${rupees(d.originalPrice)}), until ${expiryLabel(d.expiresOn)}`);
   return `Today's rescue deals at ${shopName} 🥐☕\n\n${lines.join("\n")}\n\nFresh food, lower prices, less waste. Limited stock:\n${url}`;
@@ -98,6 +140,7 @@ function Deals() {
   const [shopName, setShopName] = useState("");
   const [shareUrl, setShareUrl] = useState("");
   const [kgRescued, setKgRescued] = useState(0);
+  const [alerts, setAlerts] = useState<{ topic: string; url: string } | null>(null);
   const [missing, setMissing] = useState(false);
   const [mine, setMine] = useState<MyReservation[]>([]);
 
@@ -111,6 +154,7 @@ function Deals() {
           setShopName(data.shop.name);
           setShareUrl(data.shop.publicUrl);
           setKgRescued(data.shop.kgRescued ?? 0);
+          setAlerts(data.shop.alerts ?? null);
           setDeals(data.deals);
         })
         .catch(() => setDeals((d) => d ?? [])),
@@ -230,6 +274,8 @@ function Deals() {
           </li>
         ))}
       </ul>
+
+      {alerts && deals !== null && <DealAlerts alerts={alerts} shopName={shopName} />}
 
       {!!deals?.length && (
         <button onClick={share} className="mt-6 w-full rounded-xl bg-[#25D366] px-4 py-3 font-medium text-white hover:brightness-95">

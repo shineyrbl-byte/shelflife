@@ -1,7 +1,10 @@
 import { requireShop } from "@/lib/auth";
 import { connection } from "next/server";
 import { z } from "zod";
-import { getBatches, insertBundle, listActiveBundles } from "@/lib/db";
+import { ensureAlertsTopic, getBatches, insertBundle, listActiveBundles } from "@/lib/db";
+import { pushDealAlert } from "@/lib/notify";
+import { expiryLabel, rupees } from "@/lib/schema";
+import { publicDealsUrl } from "@/lib/urls";
 import { readBody } from "@/lib/http";
 import { availabilityOf } from "@/lib/availability";
 import type { Batch } from "@/lib/schema";
@@ -44,5 +47,17 @@ export async function POST(req: Request) {
     price: body.price,
     expiresOn: batches.map((b) => b.expiresOn).sort()[0],
   });
+  if (shop.dealAlerts) {
+    // Tell customers who follow the shop. A failed alert never blocks publishing.
+    try {
+      await pushDealAlert(await ensureAlertsTopic(shop), {
+        title: `New deal at ${shop.name}`,
+        message: `${body.title}: ${rupees(body.price)} (was ${rupees(originalPrice)}), until ${expiryLabel(batches.map((b) => b.expiresOn).sort()[0])}. Reserve it before it's gone!`,
+        clickUrl: publicDealsUrl(req, shop.slug),
+      });
+    } catch (err) {
+      console.error("deal alert failed", err);
+    }
+  }
   return Response.json({ id }, { status: 201 });
 }

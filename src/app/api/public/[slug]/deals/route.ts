@@ -1,6 +1,7 @@
 import { connection } from "next/server";
 import { availabilityOf } from "@/lib/availability";
-import { getShopBySlug, listActiveBundles, rescueTotals } from "@/lib/db";
+import { ensureAlertsTopic, getShopBySlug, listActiveBundles, rescueTotals } from "@/lib/db";
+import { topicUrl } from "@/lib/notify";
 import { impactOf } from "@/lib/impact";
 import { publicDealsUrl } from "@/lib/urls";
 
@@ -27,5 +28,9 @@ export async function GET(req: Request, { params }: Ctx) {
     .filter((d) => d.available > 0);
   const rescued = await rescueTotals(shop.id);
   const { kgRescued } = impactOf(rescued.rows, rescued.money, rescued.bundlesSold);
-  return Response.json({ shop: { name: shop.name, publicUrl: publicDealsUrl(req, shop.slug), kgRescued }, deals });
+  const alerts = shop.dealAlerts ? await ensureAlertsTopic(shop) : null;
+  return Response.json({
+    shop: { name: shop.name, publicUrl: publicDealsUrl(req, shop.slug), kgRescued, alerts: alerts && { topic: alerts, url: topicUrl(alerts) } },
+    deals,
+  });
 }

@@ -43,7 +43,7 @@ Each café signs up with its shop name, email and password, and only ever sees i
 | `/insights` | Owner | Ordering tips ("order 9 croissants, not 12"), waste by weekday, and where each item's stock goes |
 | `/poster` | Staff | Printable A4 poster with a QR code to the shop's deals page |
 | `/settings` | Owner | Shop name, the customer page link, and the ntfy topic for the morning summary |
-| `/s/<shop>` | Customers | Phone-friendly list of the shop's bundles today: **Reserve for pickup** (a 4-digit code, held for 1 hour) and *Share on WhatsApp* |
+| `/s/<shop>` | Customers | Phone-friendly list of the shop's bundles today: **Reserve for pickup** (a 4-digit code, held for 1 hour), **🔔 Get deal alerts** and *Share on WhatsApp* |
 
 ### Rescue bundles (`src/lib/bundles.ts`)
 
@@ -64,6 +64,10 @@ Staff photograph a supplier bill; Gemini returns each stock line as schema-check
 ### Impact numbers (`src/lib/impact.ts`)
 
 The dashboard shows food rescued (kg), CO₂ avoided and money recovered, this month and in total, with a **Share it** button that writes a WhatsApp message. Food sold by kg or litre counts as is; pieces and packs use a typical weight per category (e.g. 80 g for bakery, 250 g for prepared food). CO₂ uses about 2.5 kg CO₂e per kg of food not wasted, the FAO's global average for food waste. Both are labelled as estimates wherever they appear. The customer page shows the shop's total, and the homepage shows totals across all shops.
+
+### Deal alerts for customers
+
+Each shop gets a public [ntfy](https://ntfy.sh) topic (e.g. `shelflife-cafe-mogra-1a2b3c4d`, created on first use). On the deals page, **🔔 Get deal alerts** shows how to follow it: in the browser through ntfy's web app, or in the free ntfy app, with no account. Every time staff publish a bundle, followers get *New deal at Café Mogra: Croissant ₹35 (was ₹60), until today*, linking back to the deals page. It's sent as ntfy JSON so ₹ and non-English names work, and a failed alert never blocks publishing. Owners can switch it off in **Settings**. Deals are public anyway, so the topic is too.
 
 ### Customer pre-orders
 
