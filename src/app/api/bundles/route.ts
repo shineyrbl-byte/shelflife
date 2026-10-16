@@ -1,9 +1,9 @@
 import { requireShop } from "@/lib/auth";
 import { connection } from "next/server";
 import { z } from "zod";
-import { bundlesAvailable } from "@/lib/bundles";
 import { getBatches, insertBundle, listActiveBundles } from "@/lib/db";
 import { readBody } from "@/lib/http";
+import { availabilityOf } from "@/lib/availability";
 import type { Batch } from "@/lib/schema";
 
 export async function GET() {
@@ -11,14 +11,9 @@ export async function GET() {
   const shop = await requireShop();
   if (shop instanceof Response) return shop;
   const bundles = await listActiveBundles(shop.id);
-  const stock = await getBatches(shop.id, [...new Set(bundles.flatMap((b) => b.items.map((i) => i.batchId)))]);
-  // Live availability: how many more of each bundle the remaining stock can make.
-  return Response.json(
-    bundles.map((b) => ({
-      ...b,
-      available: bundlesAvailable(b.items.map((i) => ({ quantity: i.quantity, remaining: stock.get(i.batchId)?.remaining ?? 0 }))),
-    })),
-  );
+  // Live availability: what the remaining stock can make, minus customers' reservations.
+  const avail = await availabilityOf(shop.id, bundles);
+  return Response.json(bundles.map((b) => ({ ...b, ...avail.get(b.id)! })));
 }
 
 const Body = z.object({

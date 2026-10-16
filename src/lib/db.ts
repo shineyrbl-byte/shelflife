@@ -90,6 +90,19 @@ const SCHEMA = `
     expires_on TEXT NOT NULL,
     created_at TEXT NOT NULL
   );
+  -- Customer pre-orders: a bundle held for pickup until expires_at. Only a first name is kept.
+  CREATE TABLE IF NOT EXISTS reservations (
+    id TEXT PRIMARY KEY,
+    shop_id TEXT NOT NULL REFERENCES shops(id),
+    bundle_id TEXT NOT NULL REFERENCES bundles(id),
+    customer_name TEXT NOT NULL,
+    code TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'held',
+    client_hash TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    expires_at TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS reservations_shop ON reservations(shop_id, status, expires_at);
   CREATE TABLE IF NOT EXISTS bundle_sales (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     bundle_id TEXT NOT NULL REFERENCES bundles(id),
@@ -456,3 +469,90 @@ export async function bundleRevenue(shopId: string, since: string): Promise<numb
 export async function setBundleStatus(shopId: string, id: string, status: Bundle["status"], db: Db = client) {
   await run("UPDATE bundles SET status = ? WHERE id = ? AND shop_id = ?", [status, id, shopId], db);
 }
+
+// ---- Reservations (customer pre-orders) ----
+
+export type Reservation = {
+  id: string;
+  bundleId: string;
+  bundleTitle: string;
+  price: number;
+  customerName: string;
+  code: string;
+  status: "held" | "collected" | "cancelled";
+  createdAt: string;
+  expiresAt: string;
+};
+
+const RESERVATION_SELECT = `SELECT r.*, b.title AS bundle_title, b.price FROM reservations r JOIN bundles b ON b.id = r.bundle_id`;
+
+const toReservation = (r: Row): Reservation => ({
+  id: r.id as string,
+  bundleId: r.bundle_id as string,
+  bundleTitle: r.bundle_title as string,
+  price: r.price as number,
+  customerName: r.customer_name as string,
+  code: r.code as string,
+  status: r.status as Reservation["status"],
+  createdAt: r.created_at as string,
+  expiresAt: r.expires_at as string,
+});
+
+/** Active holds per bundle (held and not yet expired), optionally leaving one reservation out. */
+export async function holdsByBundle(shopId: string, db: Db = client, exceptId = ""): Promise<Map<string, number>> {
+  const rows = await all(
+    "SELECT bundle_id, COUNT(*) AS n FROM reservations WHERE shop_id = ? AND status = 'held' AND expires_at > ? AND id != ? GROUP BY bundle_id",
+    [shopId, new Date().toISOString(), exceptId],
+    db,
+  );
+  return new Map(rows.map((r) => [r.bundle_id as string, r.n as number]));
+}
+
+/** Active holds this customer (by hashed IP) already has at the shop. */
+export async function countClientHolds(shopId: string, clientHash: string, db: Db = client): Promise<number> {
+  const r = await one(
+    "SELECT COUNT(*) AS n FROM reservations WHERE shop_id = ? AND client_hash = ? AND status = 'held' AND expires_at > ?",
+    [shopId, clientHash, new Date().toISOString()],
+    db,
+  );
+  return (r?.n as number) ?? 0;
+}
+
+/** Pickup codes in use right now, so a new one doesn't clash. */
+export async function activeCodes(shopId: string, db: Db = client): Promise<Set<string>> {
+  const rows = await all("SELECT code FROM reservations WHERE shop_id = ? AND status = 'held' AND expires_at > ?", [shopId, new Date().toISOString()], db);
+  return new Set(rows.map((r) => r.code as string));
+}
+
+export async function insertReservation(
+  shopId: string,
+  r: { bundleId: string; customerName: string; code: string; clientHash: string; expiresAt: string },
+  db: Db = client,
+): Promise<string> {
+  const id = randomUUID();
+  await run(
+    `INSERT INTO reservations (id, shop_id, bundle_id, customer_name, code, client_hash, created_at, expires_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    [id, shopId, r.bundleId, r.customerName, r.code, r.clientHash, new Date().toISOString(), r.expiresAt],
+    db,
+  );
+  return id;
+}
+
+export async function getReservation(shopId: string, id: string, db: Db = client): Promise<Reservation | null> {
+  const r = await one(`${RESERVATION_SELECT} WHERE r.shop_id = ? AND r.id = ?`, [shopId, id], db);
+  return r ? toReservation(r) : null;
+}
+
+/** Held reservations from the last day (including ones that just expired), soonest pickup first. */
+export async function listOpenReservations(shopId: string): Promise<Reservation[]> {
+  const since = new Date(Date.now() - 86400000).toISOString();
+  return (await all(`${RESERVATION_SELECT} WHERE r.shop_id = ? AND r.status = 'held' AND r.expires_at > ? ORDER BY r.expires_at`, [shopId, since])).map(
+    toReservation,
+  );
+}
+
+export async function setReservationStatus(shopId: string, id: string, status: Reservation["status"], db: Db = client) {
+  await run("UPDATE reservations SET status = ? WHERE id = ? AND shop_id = ?", [status, id, shopId], db);
+}
+

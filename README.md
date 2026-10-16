@@ -36,11 +36,11 @@ Each café signs up with its shop name, email and password, and only ever sees i
 |---|---|---|
 | `/` Dashboard | Owner | Stock value at risk now, expired stock to log, the last 7/30 days (money rescued, waste at cost, rescue rate), and today's summary to send on WhatsApp |
 | `/stock` | Staff | Scan a supplier bill or add deliveries by hand, with expiry dates; stock grouped by urgency; log units as sold or wasted |
-| `/bundles` | Staff | Suggested rescue bundles to publish (price editable); live bundles with a *Sold 1* button for the till |
+| `/bundles` | Staff | Customer reservations to hand over (*Picked up* / *Cancel*); suggested rescue bundles to publish (price editable); live bundles with a *Sold 1* button for the till |
 | `/insights` | Owner | Ordering tips ("order 9 croissants, not 12"), waste by weekday, and where each item's stock goes |
 | `/poster` | Staff | Printable A4 poster with a QR code to the shop's deals page |
 | `/settings` | Owner | Shop name, the customer page link, and the ntfy topic for the morning summary |
-| `/s/<shop>` | Customers | Phone-friendly list of the shop's bundles today, with a *Share on WhatsApp* button |
+| `/s/<shop>` | Customers | Phone-friendly list of the shop's bundles today: **Reserve for pickup** (a 4-digit code, held for 1 hour) and *Share on WhatsApp* |
 
 ### Rescue bundles (`src/lib/bundles.ts`)
 
@@ -53,6 +53,15 @@ Each café signs up with its shop name, email and password, and only ever sees i
 ### Bill scanning (`src/lib/ai.ts`)
 
 Staff photograph a supplier bill; Gemini returns each stock line as schema-checked JSON: a clean name, category, quantity converted to a sensible unit (2 trays of 30 eggs = 60 pcs), cost per unit, and a typical shelf life. Delivery charges and tax lines are skipped. Bills don't show selling prices or expiry dates, so the app suggests about twice cost and an estimated expiry, and **nothing is saved until staff review every line** in an editable table. The chosen lines are added in one transaction. Photos are shrunk in the browser before upload.
+
+### Customer pre-orders
+
+On a shop's deals page, customers tap **Reserve for pickup**, enter a first name, and get a 4-digit pickup code. The bundle is held for 1 hour: it's subtracted from what's available to everyone else, and staff can't sell it to a walk-in at the till. Staff see the reservations at the top of **Bundles**, check the name and code, take payment and tap **Picked up**, which records the sale. Holds expire on their own; a late customer can still collect if stock is left.
+
+- Each customer (identified by a salted hash of their IP address, never the IP itself) can hold at most 2 deals at a shop at a time.
+- Only a first name is stored: no phone number or email.
+- Customers can cancel their own reservation; that needs its id and code, which only their browser has.
+- Availability is checked and the hold created in one transaction, so two customers can't both get the last one.
 
 ### Barcode scanning
 
