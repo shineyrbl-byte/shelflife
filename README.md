@@ -121,6 +121,19 @@ Next.js 16 (App Router, React 19, Tailwind 4)
 - **Money is valued two ways.** Waste is counted at cost (what the shop actually lost); bundle revenue is what customers paid.
 - **Server decides prices.** When a bundle is published, normal prices and expiry come from the stock records, not the browser.
 
+## Tests and checks
+
+```bash
+npm test          # unit and database tests (Vitest), about 1 second
+npm run lint
+npm run typecheck
+npm run build
+```
+
+- **Pure logic**: bundle pairing and pricing (never below cost), ordering tips, impact maths, CSV escaping and formula-injection defence, expiry dates, input validation, and that every translation has every line with the same `{placeholders}`.
+- **Database rules**, against a throwaway SQLite file: shops can't see or change each other's data, six simultaneous sales of a bundle with stock for two sell exactly two, reservations hold stock until they expire, changing a password ends every session, one-time links work once, and the owner can't be removed.
+- **GitHub Actions** (`.github/workflows/ci.yml`) runs lint, typecheck, tests and the production build on every pull request and push to `main`; `main` only accepts merges that pass.
+
 ## What's next
 
 - Barcode or photo entry for deliveries
