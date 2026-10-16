@@ -5,13 +5,14 @@ const NAV = [
   { href: "/stock", label: "Stock" },
   { href: "/bundles", label: "Bundles" },
   { href: "/insights", label: "Insights" },
+  { href: "/poster", label: "Poster" },
 ];
 
 /** Staff pages get the app navigation; the public /deals page doesn't. */
 export default function StaffLayout({ children }: LayoutProps<"/">) {
   return (
     <>
-      <header className="sticky top-0 z-20 border-b border-stone-200 bg-white/80 backdrop-blur">
+      <header className="sticky top-0 z-20 border-b print:hidden border-stone-200 bg-white/80 backdrop-blur">
         <nav className="mx-auto flex max-w-5xl items-center gap-6 px-5 py-3 text-sm">
           <Link href="/" className="flex items-center gap-2 font-semibold text-stone-900">
             <span className="grid h-7 w-7 place-items-center rounded-lg bg-emerald-600 text-white">⏳</span>

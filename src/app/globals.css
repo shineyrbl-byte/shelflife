@@ -9,3 +9,13 @@ body {
   background: #fafaf9;
   color: #1c1917;
 }
+
+@media print {
+  @page {
+    size: A4;
+    margin: 12mm;
+  }
+  body {
+    background: white;
+  }
+}
