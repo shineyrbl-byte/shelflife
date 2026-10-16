@@ -4,6 +4,7 @@ import { Suspense, useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { LanguageSwitch, useT } from "@/lib/i18n";
 import { rupees } from "@/lib/schema";
+import { upiNote, upiPayUrl } from "@/lib/upi";
 
 type Deal = {
   id: string;
@@ -16,7 +17,7 @@ type Deal = {
   available: number;
 };
 
-type MyReservation = { id: string; code: string; expiresAt: string; title: string; price: number };
+type MyReservation = { id: string; code: string; expiresAt: string; title: string; price: number; paid?: boolean };
 
 // A customer's own reservations live in their browser only, so the page can show their pickup codes again.
 const storageKey = (slug: string) => `sl-reservations:${slug}`;
@@ -87,6 +88,36 @@ function ReserveForm({ slug, deal, onReserved }: { slug: string; deal: Deal; onR
   );
 }
 
+/** Optional UPI pre-payment for a reservation: opens a UPI app (or shows a QR on a computer), then "I've paid". */
+function PayByUpi({ r, upiId, shopName, onPaid }: { r: MyReservation; upiId: string; shopName: string; onPaid: () => void }) {
+  const { t } = useT();
+  const [qr, setQr] = useState("");
+  const url = upiPayUrl({ upiId, payeeName: shopName, amount: r.price, note: upiNote(r.code) });
+
+  async function toggleQr() {
+    if (qr) return setQr("");
+    const QRCode = (await import("qrcode")).default;
+    setQr(await QRCode.toString(url, { type: "svg", margin: 1 }));
+  }
+
+  return (
+    <div className="mt-4 rounded-xl bg-white p-3">
+      <a href={url} className="block rounded-lg bg-stone-900 px-4 py-2.5 text-center text-sm font-medium text-white">
+        {t("deals.payUpi", { price: rupees(r.price) })}
+      </a>
+      <p className="mt-1.5 text-xs text-stone-500">{t("deals.payUpiHint")}</p>
+      <button onClick={toggleQr} className="mt-1 text-xs text-stone-500 underline">
+        {qr ? t("deals.hideQr") : t("deals.showQr")}
+      </button>
+      {/* The SVG comes from the qrcode library, not from user content. */}
+      {qr && <div className="mx-auto mt-2 w-44" dangerouslySetInnerHTML={{ __html: qr }} />}
+      <button onClick={onPaid} className="mt-3 w-full rounded-lg border border-emerald-600 px-4 py-2 text-sm font-medium text-emerald-700">
+        {t("deals.paidButton")}
+      </button>
+    </div>
+  );
+}
+
 /** How customers follow the shop: ntfy in the browser or the free ntfy app, no account needed. */
 function DealAlerts({ alerts, shopName }: { alerts: { topic: string; url: string }; shopName: string }) {
   const { t } = useT();
@@ -139,6 +170,7 @@ function Deals() {
   const [shareUrl, setShareUrl] = useState("");
   const [kgRescued, setKgRescued] = useState(0);
   const [alerts, setAlerts] = useState<{ topic: string; url: string } | null>(null);
+  const [upiId, setUpiId] = useState<string | null>(null);
   const [missing, setMissing] = useState(false);
   const [mine, setMine] = useState<MyReservation[]>([]);
 
@@ -153,6 +185,7 @@ function Deals() {
           setShareUrl(data.shop.publicUrl);
           setKgRescued(data.shop.kgRescued ?? 0);
           setAlerts(data.shop.alerts ?? null);
+          setUpiId(data.shop.upiId ?? null);
           setDeals(data.deals);
         })
         .catch(() => setDeals((d) => d ?? [])),
@@ -172,6 +205,18 @@ function Deals() {
     setMine(list);
     load();
     window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  async function paid(r: MyReservation) {
+    const res = await fetch(`/api/public/${encodeURIComponent(slug)}/reservations/${r.id}/paid`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code: r.code }),
+    });
+    if (!res.ok) return;
+    const list = loadMine(slug).map((x) => (x.id === r.id ? { ...x, paid: true } : x));
+    saveMine(slug, list);
+    setMine(list);
   }
 
   async function cancelMine(r: MyReservation) {
@@ -228,12 +273,17 @@ function Deals() {
                 <div className="pb-1 text-sm text-stone-600">
                   <b>{t("deals.pickUpBy", { time: time(r.expiresAt) })}</b>
                   <br />
-                  {t("deals.payAtCounter", { price: rupees(r.price) })}
+                  {r.paid ? t("deals.paidDone") : t("deals.payAtCounter", { price: rupees(r.price) })}
                 </div>
               </div>
-              <button onClick={() => cancelMine(r)} className="mt-3 text-xs text-stone-500 underline">
-                {t("deals.cantMakeIt")}
-              </button>
+              {upiId && !r.paid && <PayByUpi r={r} upiId={upiId} shopName={shopName} onPaid={() => paid(r)} />}
+              {r.paid ? (
+                <p className="mt-3 text-xs text-stone-500">{t("deals.paidCantCancel")}</p>
+              ) : (
+                <button onClick={() => cancelMine(r)} className="mt-3 text-xs text-stone-500 underline">
+                  {t("deals.cantMakeIt")}
+                </button>
+              )}
             </div>
           ))}
         </section>

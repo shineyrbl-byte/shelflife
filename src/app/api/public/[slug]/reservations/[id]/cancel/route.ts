@@ -17,6 +17,8 @@ export async function POST(req: Request, { params }: Ctx) {
   if (!shop || !r || !timingSafeEqual(Buffer.from(r.code), Buffer.from(body.code))) {
     return Response.json({ error: "Reservation not found." }, { status: 404 });
   }
+  // Once a customer says they've paid, only the shop can cancel, so the refund isn't forgotten.
+  if (r.upiClaimed) return Response.json({ error: "You've paid for this, so please ask the shop to cancel it and refund you." }, { status: 409 });
   if (r.status === "held") await setReservationStatus(shop.id, r.id, "cancelled");
   return new Response(null, { status: 204 });
 }
