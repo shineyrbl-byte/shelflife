@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { api } from "@/lib/client";
 
-type ShopSettings = { name: string; slug: string; ntfyTopic: string | null };
+type ShopSettings = { name: string; slug: string; ntfyTopic: string | null; publicUrl: string };
 
 /** A hard-to-guess topic, e.g. "shelflife-cafe-mogra-k3x9q2p7". */
 const randomTopic = (slug: string) => `shelflife-${slug.slice(0, 24)}-${Math.random().toString(36).slice(2, 10)}`;
@@ -36,7 +36,7 @@ export default function SettingsPage() {
   }
 
   if (!shop) return <p className="py-24 text-center text-stone-500">Loading…</p>;
-  const publicUrl = `${window.location.origin}/s/${shop.slug}`;
+  const { publicUrl } = shop;
   const input = "mt-1 w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none";
 
   return (
