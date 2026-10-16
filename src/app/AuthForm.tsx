@@ -20,7 +20,7 @@ function Form({ mode }: { mode: Mode }) {
     const res = await fetch(`/api/auth/${mode}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     if (res.ok) {
       // Only follow same-site paths, never a full URL from the query string.
-      window.location.href = next?.startsWith("/") && !next.startsWith("//") ? next : "/";
+      window.location.href = next?.startsWith("/") && !next.startsWith("//") ? next : "/dashboard";
       return;
     }
     setError((await res.json().catch(() => ({}))).error ?? "Something went wrong. Please try again.");
