@@ -25,6 +25,7 @@ function Deals() {
   const { slug } = useParams<{ slug: string }>();
   const [deals, setDeals] = useState<Deal[] | null>(null);
   const [shopName, setShopName] = useState("");
+  const [shareUrl, setShareUrl] = useState("");
   const [missing, setMissing] = useState(false);
 
   useEffect(() => {
@@ -34,6 +35,7 @@ function Deals() {
           if (res.status === 404) return setMissing(true);
           const data = await res.json();
           setShopName(data.shop.name);
+          setShareUrl(data.shop.publicUrl);
           setDeals(data.deals);
         })
         .catch(() => setDeals((d) => d ?? []));
@@ -49,7 +51,7 @@ function Deals() {
 
   const share = () => {
     if (!deals?.length) return;
-    window.open(`https://wa.me/?text=${encodeURIComponent(whatsappText(shopName, deals, window.location.href))}`, "_blank");
+    window.open(`https://wa.me/?text=${encodeURIComponent(whatsappText(shopName, deals, shareUrl || window.location.href))}`, "_blank");
   };
 
   return (

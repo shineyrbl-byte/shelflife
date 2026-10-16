@@ -4,12 +4,13 @@ import { requireShop } from "@/lib/auth";
 import { getShop, updateShop } from "@/lib/db";
 import { readBody } from "@/lib/http";
 import { NTFY_TOPIC_PATTERN } from "@/lib/notify";
+import { publicDealsUrl } from "@/lib/urls";
 
-export async function GET() {
+export async function GET(req: Request) {
   await connection();
   const shop = await requireShop();
   if (shop instanceof Response) return shop;
-  return Response.json({ name: shop.name, slug: shop.slug, ntfyTopic: shop.ntfyTopic });
+  return Response.json({ name: shop.name, slug: shop.slug, ntfyTopic: shop.ntfyTopic, publicUrl: publicDealsUrl(req, shop.slug) });
 }
 
 const Body = z.object({
@@ -30,5 +31,5 @@ export async function PATCH(req: Request) {
   if (body instanceof Response) return body;
   await updateShop(shop.id, { name: body.name, ntfyTopic: body.ntfyTopic === undefined ? undefined : body.ntfyTopic || null });
   const updated = await getShop(shop.id);
-  return Response.json({ name: updated!.name, slug: updated!.slug, ntfyTopic: updated!.ntfyTopic });
+  return Response.json({ name: updated!.name, slug: updated!.slug, ntfyTopic: updated!.ntfyTopic, publicUrl: publicDealsUrl(req, updated!.slug) });
 }
