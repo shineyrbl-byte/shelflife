@@ -6,7 +6,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "ShelfLife: sell it before it expires",
     short_name: "ShelfLife",
     description: "Expiry tracking and rescue bundles for small cafés and grocers.",
-    start_url: "/",
+    start_url: "/dashboard",
     scope: "/",
     display: "standalone",
     orientation: "portrait",

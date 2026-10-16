@@ -34,7 +34,8 @@ Each café signs up with its shop name, email and password, and only ever sees i
 
 | Page | Who | What |
 |---|---|---|
-| `/` Dashboard | Owner | Stock value at risk now, expired stock to log, the last 7/30 days (money rescued, waste at cost, rescue rate), and today's summary to send on WhatsApp |
+| `/` | Everyone | Public homepage: what ShelfLife does, live totals across all shops, sign-up (logged-in staff go straight to the dashboard) |
+| `/dashboard` | Owner | Stock value at risk now, expired stock to log, the last 7/30 days (money rescued, waste at cost, rescue rate), and today's summary to send on WhatsApp |
 | `/stock` | Staff | Scan a supplier bill or add deliveries by hand, with expiry dates; stock grouped by urgency; log units as sold or wasted |
 | `/bundles` | Staff | Customer reservations to hand over (*Picked up* / *Cancel*); suggested rescue bundles to publish (price editable); live bundles with a *Sold 1* button for the till |
 | `/insights` | Owner | Ordering tips ("order 9 croissants, not 12"), waste by weekday, and where each item's stock goes |

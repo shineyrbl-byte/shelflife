@@ -2,7 +2,7 @@ import Link from "next/link";
 import ShopMenu from "./ShopMenu";
 
 const NAV = [
-  { href: "/", label: "Dashboard" },
+  { href: "/dashboard", label: "Dashboard" },
   { href: "/stock", label: "Stock" },
   { href: "/bundles", label: "Bundles" },
   { href: "/insights", label: "Insights" },
@@ -16,7 +16,7 @@ export default function StaffLayout({ children }: LayoutProps<"/">) {
     <>
       <header className="sticky top-0 z-20 border-b print:hidden border-stone-200 bg-white/80 backdrop-blur">
         <nav className="mx-auto flex max-w-5xl items-center gap-6 px-5 py-3 text-sm">
-          <Link href="/" className="flex items-center gap-2 font-semibold text-stone-900">
+          <Link href="/dashboard" className="flex items-center gap-2 font-semibold text-stone-900">
             {/* eslint-disable-next-line @next/next/no-img-element -- tiny static icon */}
             <img src="/icon-192.png" alt="" className="h-7 w-7 rounded-lg" />
             ShelfLife
