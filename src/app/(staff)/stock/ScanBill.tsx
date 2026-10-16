@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { api } from "@/lib/client";
+import { useT } from "@/lib/i18n";
 import { CATEGORIES, UNITS, rupees, type BatchInput } from "@/lib/schema";
 
 type Line = BatchInput & { include: boolean };
@@ -23,6 +24,7 @@ async function shrink(file: File, maxSide = 1800): Promise<Blob> {
 }
 
 export default function ScanBill({ onAdded }: { onAdded: () => void }) {
+  const { t, category, unit } = useT();
   const input = useRef<HTMLInputElement>(null);
   const [status, setStatus] = useState<"idle" | "reading" | "review" | "saving">("idle");
   const [lines, setLines] = useState<Line[]>([]);
@@ -54,7 +56,7 @@ export default function ScanBill({ onAdded }: { onAdded: () => void }) {
   async function addAll() {
     setError("");
     const bad = chosen.find((l) => !l.name.trim() || !(l.quantity > 0) || l.unitPrice < l.unitCost);
-    if (bad) return setError(`Check "${bad.name || "unnamed item"}": it needs a name, a quantity, and a price at or above cost.`);
+    if (bad) return setError(t("bill.checkLine", { name: bad.name || t("bill.unnamed") }));
     setStatus("saving");
     try {
       await api("/api/stock/bulk", { method: "POST", body: JSON.stringify({ items: chosen.map(({ include, ...l }) => (void include, l)) }) });
@@ -74,8 +76,8 @@ export default function ScanBill({ onAdded }: { onAdded: () => void }) {
     <div className="rounded-2xl border border-violet-200 bg-violet-50/50 p-5">
       <div className="flex flex-wrap items-center gap-3">
         <div className="flex-1">
-          <h2 className="font-semibold">📷 Scan a supplier bill</h2>
-          <p className="text-sm text-stone-500">Take a photo of the bill and AI fills in the items. You check everything before it&apos;s added.</p>
+          <h2 className="font-semibold">{t("bill.title")}</h2>
+          <p className="text-sm text-stone-500">{t("bill.subtitle")}</p>
         </div>
         <input
           ref={input}
@@ -94,7 +96,7 @@ export default function ScanBill({ onAdded }: { onAdded: () => void }) {
           disabled={status === "reading" || status === "saving"}
           className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white hover:bg-violet-700 disabled:opacity-50"
         >
-          {status === "reading" ? "Reading the bill…" : status === "review" ? "Scan another" : "Scan a bill"}
+          {status === "reading" ? t("bill.reading") : status === "review" ? t("bill.another") : t("bill.scan")}
         </button>
       </div>
       {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
@@ -102,20 +104,20 @@ export default function ScanBill({ onAdded }: { onAdded: () => void }) {
       {status !== "idle" && status !== "reading" && lines.length > 0 && (
         <div className="mt-4">
           <p className="text-sm text-stone-600">
-            Found {lines.length} item{lines.length > 1 ? "s" : ""}
-            {supplier ? ` from ${supplier}` : ""}. <b>Expiry dates are AI estimates</b> and prices start at about twice cost: check both.
+            {t("bill.found", { n: lines.length })}
+            {supplier ? t("bill.from", { supplier }) : ""}. <b>{t("bill.checkBoth")}</b>
           </p>
           <div className="mt-3 overflow-x-auto rounded-xl border border-stone-200 bg-white">
             <table className="w-full min-w-[760px] text-sm">
               <thead className="bg-stone-50 text-left text-xs uppercase text-stone-500">
                 <tr>
                   <th className="px-3 py-2" />
-                  <th className="px-2 py-2">Item</th>
-                  <th className="px-2 py-2">Category</th>
-                  <th className="px-2 py-2">Qty</th>
-                  <th className="px-2 py-2">Cost/unit</th>
-                  <th className="px-2 py-2">Price/unit</th>
-                  <th className="px-2 py-2">Expires</th>
+                  <th className="px-2 py-2">{t("bill.col.item")}</th>
+                  <th className="px-2 py-2">{t("bill.col.category")}</th>
+                  <th className="px-2 py-2">{t("bill.col.qty")}</th>
+                  <th className="px-2 py-2">{t("bill.col.cost")}</th>
+                  <th className="px-2 py-2">{t("bill.col.price")}</th>
+                  <th className="px-2 py-2">{t("bill.col.expires")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -129,14 +131,14 @@ export default function ScanBill({ onAdded }: { onAdded: () => void }) {
                     </td>
                     <td className="px-2 py-1.5">
                       <select className={cell} value={l.category} onChange={(e) => update(i, { category: e.target.value as Line["category"] })}>
-                        {CATEGORIES.map((c) => <option key={c}>{c}</option>)}
+                        {CATEGORIES.map((c) => <option key={c} value={c}>{category(c)}</option>)}
                       </select>
                     </td>
                     <td className="px-2 py-1.5">
                       <div className="flex gap-1">
                         <input className={`${cell} w-16`} inputMode="decimal" value={l.quantity} onChange={(e) => update(i, { quantity: num(e.target.value) })} />
                         <select className={`${cell} w-16`} value={l.unit} onChange={(e) => update(i, { unit: e.target.value as Line["unit"] })}>
-                          {UNITS.map((u) => <option key={u}>{u}</option>)}
+                          {UNITS.map((u) => <option key={u} value={u}>{unit(u)}</option>)}
                         </select>
                       </div>
                     </td>
@@ -156,17 +158,17 @@ export default function ScanBill({ onAdded }: { onAdded: () => void }) {
           </div>
           <div className="mt-3 flex items-center gap-3">
             <span className="text-sm text-stone-500">
-              {chosen.length} selected · {rupees(chosen.reduce((s, l) => s + l.quantity * l.unitCost, 0))} at cost
+              {t("bill.selected", { n: chosen.length })} · {t("common.atCost", { amount: rupees(chosen.reduce((s, l) => s + l.quantity * l.unitCost, 0)) })}
             </span>
             <button onClick={() => setLines([])} className="ml-auto rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm hover:bg-stone-50">
-              Discard
+              {t("bill.discard")}
             </button>
             <button
               onClick={addAll}
               disabled={!chosen.length || status === "saving"}
               className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
             >
-              {status === "saving" ? "Adding…" : `Add ${chosen.length} item${chosen.length === 1 ? "" : "s"} to stock`}
+              {status === "saving" ? t("add.adding") : t("bill.add", { n: chosen.length })}
             </button>
           </div>
         </div>

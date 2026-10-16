@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useT } from "@/lib/i18n";
 
 /** Full-screen camera view that reads one barcode and closes. Uses the back camera on phones. */
 export default function BarcodeScanner({ onCode, onClose }: { onCode: (code: string) => void; onClose: () => void }) {
   const video = useRef<HTMLVideoElement>(null);
-  const [error, setError] = useState("");
+  const { t } = useT();
+  const [error, setError] = useState<"" | "denied" | "failed">("");
 
   useEffect(() => {
     let stop = () => {};
@@ -31,11 +33,7 @@ export default function BarcodeScanner({ onCode, onClose }: { onCode: (code: str
         if (done) stop();
       } catch (err) {
         const name = (err as Error).name;
-        setError(
-          name === "NotAllowedError"
-            ? "Camera permission was denied. Allow camera access for this site in your browser settings, or type the barcode instead."
-            : "Couldn't open the camera. You can type the barcode instead.",
-        );
+        setError(name === "NotAllowedError" ? "denied" : "failed");
       }
     })();
     return () => {
@@ -51,9 +49,9 @@ export default function BarcodeScanner({ onCode, onClose }: { onCode: (code: str
         {/* Aiming guide */}
         <div className="pointer-events-none absolute inset-x-8 top-1/2 h-28 -translate-y-1/2 rounded-xl border-2 border-white/80" />
       </div>
-      <p className="mt-4 text-center text-sm text-white/80">{error || "Point the camera at the barcode. It scans automatically."}</p>
+      <p className="mt-4 text-center text-sm text-white/80">{error ? t(error === "denied" ? "scanner.denied" : "scanner.failed") : t("scanner.hint")}</p>
       <button onClick={onClose} className="mt-4 rounded-lg bg-white px-5 py-2 text-sm font-medium text-stone-900">
-        Cancel
+        {t("common.cancel")}
       </button>
     </div>
   );

@@ -4,15 +4,16 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "@/lib/client";
 import ScanBill from "./ScanBill";
 import BarcodeScanner from "./BarcodeScanner";
-import { CATEGORIES, UNITS, expiryLabel, rupees, today, type Batch, type BatchInput, type Freshness } from "@/lib/schema";
+import { useT, type Key } from "@/lib/i18n";
+import { CATEGORIES, UNITS, rupees, today, type Batch, type BatchInput, type Freshness } from "@/lib/schema";
 
 type StockRow = Batch & { daysLeft: number; freshness: Freshness };
 
-const GROUPS: { key: Freshness; title: string; tone: string; dot: string }[] = [
-  { key: "expired", title: "Expired: log as wasted", tone: "border-red-200 bg-red-50", dot: "bg-red-500" },
-  { key: "today", title: "Expires today", tone: "border-orange-200 bg-orange-50", dot: "bg-orange-500" },
-  { key: "soon", title: "Expires in 1–2 days", tone: "border-amber-200 bg-amber-50", dot: "bg-amber-400" },
-  { key: "fresh", title: "Fresh", tone: "border-stone-200 bg-white", dot: "bg-emerald-500" },
+const GROUPS: { key: Freshness; title: Key; tone: string; dot: string }[] = [
+  { key: "expired", title: "stock.group.expired", tone: "border-red-200 bg-red-50", dot: "bg-red-500" },
+  { key: "today", title: "stock.group.today", tone: "border-orange-200 bg-orange-50", dot: "bg-orange-500" },
+  { key: "soon", title: "stock.group.soon", tone: "border-amber-200 bg-amber-50", dot: "bg-amber-400" },
+  { key: "fresh", title: "stock.group.fresh", tone: "border-stone-200 bg-white", dot: "bg-emerald-500" },
 ];
 
 const plusDays = (n: number) => today(new Date(Date.now() + n * 86400000));
@@ -21,6 +22,7 @@ const emptyForm = () => ({ barcode: "", name: "", category: "bakery", unit: "pcs
 type FormState = ReturnType<typeof emptyForm>;
 
 function AddBatchForm({ onAdded }: { onAdded: () => void }) {
+  const { t, category, unit } = useT();
   const [form, setForm] = useState(emptyForm);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -36,7 +38,7 @@ function AddBatchForm({ onAdded }: { onAdded: () => void }) {
     setScanning(false);
     if (!barcode) return;
     setError("");
-    setLookup({ tone: "info", text: "Looking up barcode…" });
+    setLookup({ tone: "info", text: t("add.lookingUp") });
     try {
       const p = await api<{ source: "shop" | "openfoodfacts" | "none"; name?: string; category?: string; unit?: string; unitCost?: number; unitPrice?: number; expiresOn?: string }>(
         `/api/products/${encodeURIComponent(barcode)}`,
@@ -51,15 +53,12 @@ function AddBatchForm({ onAdded }: { onAdded: () => void }) {
             : { name: "", unitCost: "", unitPrice: "" }),
       }));
       if (p.source === "shop") {
-        setLookup({ tone: "ok", text: `${p.name}: details filled in from last time. Enter the quantity and check the expiry date.` });
+        setLookup({ tone: "ok", text: t("add.knownItem", { name: p.name! }) });
         setTimeout(() => quantityRef.current?.focus(), 0);
       } else {
         setLookup({
           tone: "info",
-          text:
-            p.source === "openfoodfacts"
-              ? `Found "${p.name}" on Open Food Facts. Add the prices once and it'll be remembered.`
-              : "New barcode. Fill in the details once and ShelfLife will remember them next time.",
+          text: p.source === "openfoodfacts" ? t("add.foundOff", { name: p.name! }) : t("add.newBarcode"),
         });
         setTimeout(() => (p.source === "none" ? nameRef : quantityRef).current?.focus(), 0);
       }
@@ -67,7 +66,7 @@ function AddBatchForm({ onAdded }: { onAdded: () => void }) {
       setLookup(null);
       setError((err as Error).message);
     }
-  }, []);
+  }, [t]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -82,8 +81,8 @@ function AddBatchForm({ onAdded }: { onAdded: () => void }) {
       unitPrice: Number(form.unitPrice),
       expiresOn: form.expiresOn,
     };
-    if (!body.name || !(body.quantity > 0)) return setError("Add a name and a quantity.");
-    if (body.unitPrice < body.unitCost) return setError("Selling price is below cost. Double-check the prices.");
+    if (!body.name || !(body.quantity > 0)) return setError(t("add.needNameQty"));
+    if (body.unitPrice < body.unitCost) return setError(t("common.priceBelowCost"));
     setSaving(true);
     try {
       await api("/api/stock", { method: "POST", body: JSON.stringify(body) });
@@ -101,15 +100,15 @@ function AddBatchForm({ onAdded }: { onAdded: () => void }) {
   const input = "w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none";
   return (
     <form onSubmit={submit} className="rounded-2xl border border-stone-200 bg-white p-5">
-      <h2 className="font-semibold">Add stock</h2>
-      <p className="text-sm text-stone-500">One line per delivery or bake, with its expiry date. Packaged goods: scan the barcode first.</p>
+      <h2 className="font-semibold">{t("add.title")}</h2>
+      <p className="text-sm text-stone-500">{t("add.subtitle")}</p>
       <div className="mt-4 flex flex-wrap items-end gap-2">
         <label className="text-xs text-stone-500">
-          Barcode (optional)
+          {t("add.barcode")}
           <input
             className={`${input} w-48`}
             inputMode="numeric"
-            placeholder="Scan or type, then Enter"
+            placeholder={t("add.barcodePlaceholder")}
             value={form.barcode}
             onChange={set("barcode")}
             onKeyDown={(e) => {
@@ -123,59 +122,59 @@ function AddBatchForm({ onAdded }: { onAdded: () => void }) {
           />
         </label>
         <button type="button" onClick={() => setScanning(true)} className="rounded-lg border border-stone-300 px-3 py-2 text-sm hover:bg-stone-50">
-          📷 Scan barcode
+          {t("add.scanBarcode")}
         </button>
         {lookup && <p className={`basis-full text-sm ${lookup.tone === "ok" ? "text-emerald-700" : "text-stone-600"}`}>{lookup.text}</p>}
       </div>
       {scanning && <BarcodeScanner onCode={lookUp} onClose={() => setScanning(false)} />}
       <div className="mt-4 grid gap-3 sm:grid-cols-6">
         <label className="sm:col-span-2 text-xs text-stone-500">
-          Item
-          <input ref={nameRef} className={input} placeholder="e.g. Croissant" value={form.name} onChange={set("name")} />
+          {t("add.item")}
+          <input ref={nameRef} className={input} placeholder={t("add.itemPlaceholder")} value={form.name} onChange={set("name")} />
         </label>
         <label className="text-xs text-stone-500">
-          Category
+          {t("add.category")}
           <select className={input} value={form.category} onChange={set("category")}>
-            {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+            {CATEGORIES.map((c) => <option key={c} value={c}>{category(c)}</option>)}
           </select>
         </label>
         <label className="text-xs text-stone-500">
-          Quantity
+          {t("add.quantity")}
           <div className="flex gap-1">
             <input ref={quantityRef} className={input} inputMode="decimal" placeholder="12" value={form.quantity} onChange={set("quantity")} />
             <select className="rounded-lg border border-stone-300 bg-white px-1 text-sm" value={form.unit} onChange={set("unit")}>
-              {UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
+              {UNITS.map((u) => <option key={u} value={u}>{unit(u)}</option>)}
             </select>
           </div>
         </label>
         <label className="text-xs text-stone-500">
-          Cost / unit (₹)
+          {t("add.cost")}
           <input className={input} inputMode="decimal" placeholder="25" value={form.unitCost} onChange={set("unitCost")} />
         </label>
         <label className="text-xs text-stone-500">
-          Price / unit (₹)
+          {t("add.price")}
           <input className={input} inputMode="decimal" placeholder="60" value={form.unitPrice} onChange={set("unitPrice")} />
         </label>
       </div>
       <div className="mt-3 flex flex-wrap items-end gap-3">
         <label className="text-xs text-stone-500">
-          Expires on
+          {t("add.expiresOn")}
           <input type="date" className={input} value={form.expiresOn} onChange={set("expiresOn")} />
         </label>
         <div className="flex gap-1.5 pb-1">
-          {[["Today", 0], ["Tomorrow", 1], ["+3 days", 3], ["+1 week", 7]].map(([label, n]) => (
+          {([["add.today", 0], ["add.tomorrow", 1], ["add.plus3", 3], ["add.plusWeek", 7]] as const).map(([label, n]) => (
             <button
               key={label}
               type="button"
-              onClick={() => setForm({ ...form, expiresOn: plusDays(n as number) })}
-              className={`rounded-full border px-2.5 py-1 text-xs ${form.expiresOn === plusDays(n as number) ? "border-emerald-500 bg-emerald-50 text-emerald-700" : "border-stone-300 text-stone-600 hover:bg-stone-50"}`}
+              onClick={() => setForm({ ...form, expiresOn: plusDays(n) })}
+              className={`rounded-full border px-2.5 py-1 text-xs ${form.expiresOn === plusDays(n) ? "border-emerald-500 bg-emerald-50 text-emerald-700" : "border-stone-300 text-stone-600 hover:bg-stone-50"}`}
             >
-              {label}
+              {t(label)}
             </button>
           ))}
         </div>
         <button disabled={saving} className="ml-auto rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50">
-          {saving ? "Adding…" : "Add to stock"}
+          {saving ? t("add.adding") : t("add.submit")}
         </button>
       </div>
       {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
@@ -184,6 +183,7 @@ function AddBatchForm({ onAdded }: { onAdded: () => void }) {
 }
 
 function EditLine({ b, onDone }: { b: StockRow; onDone: (saved: boolean) => void }) {
+  const { t, category, unit } = useT();
   const [f, setF] = useState({
     name: b.name,
     category: b.category,
@@ -200,7 +200,7 @@ function EditLine({ b, onDone }: { b: StockRow; onDone: (saved: boolean) => void
   async function save() {
     setError("");
     const body = { ...f, name: f.name.trim(), quantity: Number(f.quantity), unitCost: Number(f.unitCost), unitPrice: Number(f.unitPrice) };
-    if (body.unitPrice < body.unitCost) return setError("Selling price is below cost. Double-check the prices.");
+    if (body.unitPrice < body.unitCost) return setError(t("common.priceBelowCost"));
     try {
       await api(`/api/stock/${b.id}`, { method: "PATCH", body: JSON.stringify(body) });
       onDone(true);
@@ -213,27 +213,27 @@ function EditLine({ b, onDone }: { b: StockRow; onDone: (saved: boolean) => void
   return (
     <li className="space-y-2 bg-white/70 px-4 py-3">
       <div className="flex flex-wrap items-end gap-2 text-xs text-stone-500">
-        <label className="flex-1 min-w-40">Item<input className={`${input} w-full`} value={f.name} onChange={set("name")} /></label>
+        <label className="flex-1 min-w-40">{t("edit.item")}<input className={`${input} w-full`} value={f.name} onChange={set("name")} /></label>
         <label>
-          Category
+          {t("edit.category")}
           <select className={`${input} block`} value={f.category} onChange={set("category")}>
-            {CATEGORIES.map((c) => <option key={c}>{c}</option>)}
+            {CATEGORIES.map((c) => <option key={c} value={c}>{category(c)}</option>)}
           </select>
         </label>
         <label>
-          {hasHistory ? `Qty received` : "Quantity"}
+          {hasHistory ? t("edit.qtyReceived") : t("edit.quantity")}
           <div className="flex gap-1">
             <input className={`${input} w-16`} inputMode="decimal" value={f.quantity} onChange={set("quantity")} />
-            <select className={input} value={f.unit} onChange={set("unit")} disabled={hasHistory} title={hasHistory ? "Unit is fixed once sales or waste are logged" : undefined}>
-              {UNITS.map((u) => <option key={u}>{u}</option>)}
+            <select className={input} value={f.unit} onChange={set("unit")} disabled={hasHistory} title={hasHistory ? t("edit.unitFixed") : undefined}>
+              {UNITS.map((u) => <option key={u} value={u}>{unit(u)}</option>)}
             </select>
           </div>
         </label>
-        <label>Cost ₹<input className={`${input} block w-20`} inputMode="decimal" value={f.unitCost} onChange={set("unitCost")} /></label>
-        <label>Price ₹<input className={`${input} block w-20`} inputMode="decimal" value={f.unitPrice} onChange={set("unitPrice")} /></label>
-        <label>Expires<input type="date" className={`${input} block`} value={f.expiresOn} onChange={set("expiresOn")} /></label>
-        <button onClick={save} className="rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-700">Save</button>
-        <button onClick={() => onDone(false)} className="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm hover:bg-stone-50">Cancel</button>
+        <label>{t("edit.cost")}<input className={`${input} block w-20`} inputMode="decimal" value={f.unitCost} onChange={set("unitCost")} /></label>
+        <label>{t("edit.price")}<input className={`${input} block w-20`} inputMode="decimal" value={f.unitPrice} onChange={set("unitPrice")} /></label>
+        <label>{t("edit.expires")}<input type="date" className={`${input} block`} value={f.expiresOn} onChange={set("expiresOn")} /></label>
+        <button onClick={save} className="rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-700">{t("common.save")}</button>
+        <button onClick={() => onDone(false)} className="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm hover:bg-stone-50">{t("common.cancel")}</button>
       </div>
       {error && <p className="text-xs text-red-600">{error}</p>}
     </li>
@@ -241,6 +241,7 @@ function EditLine({ b, onDone }: { b: StockRow; onDone: (saved: boolean) => void
 }
 
 function StockLine({ b, onChange }: { b: StockRow; onChange: () => void }) {
+  const { t, category, unit, when } = useT();
   const [editing, setEditing] = useState(false);
   const [qty, setQty] = useState("");
   const [error, setError] = useState("");
@@ -258,7 +259,7 @@ function StockLine({ b, onChange }: { b: StockRow; onChange: () => void }) {
   }
 
   async function remove() {
-    if (b.remaining !== b.quantity) return setError("This batch has history, so log it as sold or wasted instead.");
+    if (b.remaining !== b.quantity) return setError(t("stock.hasHistory"));
     await api(`/api/stock/${b.id}`, { method: "DELETE" }).then(onChange, (err) => setError(err.message));
   }
 
@@ -279,16 +280,16 @@ function StockLine({ b, onChange }: { b: StockRow; onChange: () => void }) {
       <div className="min-w-40 flex-1">
         <div className="font-medium">{b.name}</div>
         <div className="text-xs text-stone-500">
-          {b.category} · {rupees(b.unitPrice)}/{b.unit} · {b.freshness === "expired" ? `expired ${-b.daysLeft}d ago` : `expires ${expiryLabel(b.expiresOn)}`}
+          {category(b.category)} · {rupees(b.unitPrice)}/{unit(b.unit)} · {b.freshness === "expired" ? t("stock.expiredAgo", { n: -b.daysLeft }) : t("stock.expires", { when: when(b.expiresOn) })}
         </div>
       </div>
       <div className="w-28 text-right">
-        <div className="font-semibold tabular-nums">{b.remaining} {b.unit}</div>
-        <div className="text-xs text-stone-500">{rupees(b.remaining * b.unitCost)} at cost</div>
+        <div className="font-semibold tabular-nums">{b.remaining} {unit(b.unit)}</div>
+        <div className="text-xs text-stone-500">{t("common.atCost", { amount: rupees(b.remaining * b.unitCost) })}</div>
       </div>
       <div className="flex items-center gap-1.5">
         <input
-          aria-label="Quantity"
+          aria-label={t("stock.quantity")}
           inputMode="decimal"
           placeholder={`${b.remaining}`}
           value={qty}
@@ -296,16 +297,16 @@ function StockLine({ b, onChange }: { b: StockRow; onChange: () => void }) {
           className="w-16 rounded-lg border border-stone-300 px-2 py-1.5 text-sm"
         />
         {b.freshness !== "expired" && (
-          <button onClick={() => log("sold")} className="rounded-lg border border-stone-300 px-2.5 py-1.5 text-sm hover:bg-stone-50">Sold</button>
+          <button onClick={() => log("sold")} className="rounded-lg border border-stone-300 px-2.5 py-1.5 text-sm hover:bg-stone-50">{t("stock.sold")}</button>
         )}
         {b.freshness !== "expired" && (
-          <button onClick={() => log("donated")} title="Given to a food bank, NGO or people in need" className="rounded-lg border border-sky-200 px-2.5 py-1.5 text-sm text-sky-700 hover:bg-sky-50">
-            Donated
+          <button onClick={() => log("donated")} title={t("stock.donatedHint")} className="rounded-lg border border-sky-200 px-2.5 py-1.5 text-sm text-sky-700 hover:bg-sky-50">
+            {t("stock.donated")}
           </button>
         )}
-        <button onClick={() => log("wasted")} className="rounded-lg border border-red-200 px-2.5 py-1.5 text-sm text-red-700 hover:bg-red-50">Wasted</button>
-        <button onClick={() => setEditing(true)} title="Edit" className="px-1 text-stone-400 hover:text-stone-700">✎</button>
-        <button onClick={remove} title="Delete (entered by mistake)" className="px-1 text-stone-400 hover:text-stone-700">✕</button>
+        <button onClick={() => log("wasted")} className="rounded-lg border border-red-200 px-2.5 py-1.5 text-sm text-red-700 hover:bg-red-50">{t("stock.wasted")}</button>
+        <button onClick={() => setEditing(true)} title={t("stock.edit")} className="px-1 text-stone-400 hover:text-stone-700">✎</button>
+        <button onClick={remove} title={t("stock.delete")} className="px-1 text-stone-400 hover:text-stone-700">✕</button>
       </div>
       {error && <p className="w-full text-xs text-red-600">{error}</p>}
     </li>
@@ -313,6 +314,7 @@ function StockLine({ b, onChange }: { b: StockRow; onChange: () => void }) {
 }
 
 export default function StockPage() {
+  const { t } = useT();
   const [rows, setRows] = useState<StockRow[] | null>(null);
   const load = useCallback(() => api<StockRow[]>("/api/stock").then(setRows, () => setRows([])), []);
   useEffect(() => {
@@ -321,8 +323,8 @@ export default function StockPage() {
 
   return (
     <div className="mx-auto max-w-5xl px-5 py-8">
-      <h1 className="text-2xl font-semibold tracking-tight">Stock</h1>
-      <p className="text-sm text-stone-500">Soonest expiry first. Leave the quantity empty to log the whole batch.</p>
+      <h1 className="text-2xl font-semibold tracking-tight">{t("stock.title")}</h1>
+      <p className="text-sm text-stone-500">{t("stock.subtitle")}</p>
 
       {/* Rendered after the first load so date defaults use the shop's clock, not the server's. */}
       {rows !== null && (
@@ -332,8 +334,8 @@ export default function StockPage() {
         </div>
       )}
 
-      {rows === null && <p className="mt-10 text-center text-stone-500">Loading…</p>}
-      {rows?.length === 0 && <p className="mt-10 text-center text-stone-500">No stock yet. Add your first delivery above.</p>}
+      {rows === null && <p className="mt-10 text-center text-stone-500">{t("common.loading")}</p>}
+      {rows?.length === 0 && <p className="mt-10 text-center text-stone-500">{t("stock.empty")}</p>}
 
       {GROUPS.map((g) => {
         const items = rows?.filter((r) => r.freshness === g.key) ?? [];
@@ -342,9 +344,9 @@ export default function StockPage() {
           <section key={g.key} className={`mt-6 rounded-2xl border ${g.tone}`}>
             <h2 className="flex items-center gap-2 px-4 pt-3 text-sm font-semibold">
               <span className={`h-2.5 w-2.5 rounded-full ${g.dot}`} />
-              {g.title}
+              {t(g.title)}
               <span className="font-normal text-stone-500">
-                · {items.length} item{items.length > 1 ? "s" : ""} · {rupees(items.reduce((s, b) => s + b.remaining * b.unitCost, 0))} at cost
+                · {items.length === 1 ? t("stock.item") : t("stock.items", { n: items.length })} · {t("common.atCost", { amount: rupees(items.reduce((s, b) => s + b.remaining * b.unitCost, 0)) })}
               </span>
             </h2>
             <ul className="divide-y divide-stone-200/70">

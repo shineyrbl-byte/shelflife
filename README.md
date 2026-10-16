@@ -57,6 +57,10 @@ Each café signs up with its shop name, email and password, and only ever sees i
 
 Staff photograph a supplier bill; Gemini returns each stock line as schema-checked JSON: a clean name, category, quantity converted to a sensible unit (2 trays of 30 eggs = 60 pcs), cost per unit, and a typical shelf life. Delivery charges and tax lines are skipped. Bills don't show selling prices or expiry dates, so the app suggests about twice cost and an estimated expiry, and **nothing is saved until staff review every line** in an editable table. The chosen lines are added in one transaction. Photos are shrunk in the browser before upload.
 
+### Languages
+
+Staff screens (header, Stock, bill and barcode scanning, Bundles, Join) and the customer deals page can switch between **English and Hindi** with the **EN | हिं** switch; the choice is saved per device. All text lives in `src/lib/i18n.tsx`, and TypeScript checks every language has every line, so adding one (e.g. Konkani) means adding one more dictionary. Owner-only screens, product and bundle names, and server error messages stay as they are. The Hindi text was written for this app and is worth a review by a native speaker.
+
 ### Export
 
 **Dashboard → Export for your accountant** downloads a month as CSV (opens in Excel or Google Sheets): **stock activity** (every unit sold, sold in a bundle, donated or wasted, with cost and normal price) and **bundle sales** (what customers paid). Times are in the shop's time zone (`APP_TIMEZONE`, default `Asia/Kolkata`). Cells that look like spreadsheet formulas are written as text, so a product name can't run code in Excel.
