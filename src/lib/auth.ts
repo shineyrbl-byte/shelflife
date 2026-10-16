@@ -1,7 +1,7 @@
 import { createHash, randomBytes, scrypt as scryptCb, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
 import { cookies } from "next/headers";
-import { deleteSession, findSession, insertSession, type Shop, type User } from "./db";
+import { deleteSession, findSession, insertSession, insertToken, type Shop, type User } from "./db";
 
 // Email + password accounts with server-side sessions. No third-party auth service.
 
@@ -67,6 +67,14 @@ export async function currentSession(): Promise<{ user: User; shop: Shop } | nul
 export async function requireShop(): Promise<Shop | Response> {
   const session = await currentSession();
   return session ? session.shop : Response.json({ error: "Please log in again." }, { status: 401 });
+}
+
+/** Creates a one-time password reset link for a user. */
+export async function createResetLink(baseUrl: string, shopId: string, userId: string, hours: number) {
+  const { token, tokenHash } = newToken();
+  const expiresAt = new Date(Date.now() + hours * 3600000).toISOString();
+  await insertToken({ tokenHash, kind: "reset", shopId, userId, expiresAt });
+  return { url: `${baseUrl}/reset?token=${token}`, expiresAt };
 }
 
 /**

@@ -34,6 +34,15 @@ The tables are created automatically the first time the app connects.
 3. **Poster** now shows a QR code with your public link: print it for the counter.
 4. **Settings → Morning summary**: set an ntfy topic to get the summary at 8:00 a.m. every day. To test it straight away, open **Vercel → your project → Settings → Cron Jobs** and click **Run**.
 
+## Optional: emails for "Forgot password"
+
+Without this, staff can still get reset links from the owner (Settings → Team), and you can make one for anyone with `npm run reset-password -- --email … --url https://your-app.vercel.app` (with the Turso variables in `.env.local`).
+
+1. Sign up at [brevo.com](https://www.brevo.com) (free plan, 300 emails a day).
+2. **Senders, Domains & Dedicated IPs → Senders → Add a sender**: use your own email address and click the link Brevo emails you to verify it.
+3. **SMTP & API → API Keys → Generate a new API key**, and copy it.
+4. In Vercel, add `BREVO_API_KEY` (the key) and `EMAIL_FROM` (the verified address), then redeploy.
+
 ## Good to know
 
 - Every push to `main` on GitHub redeploys automatically.
