@@ -1,6 +1,7 @@
 import { connection } from "next/server";
 import { availabilityOf } from "@/lib/availability";
-import { getShopBySlug, listActiveBundles } from "@/lib/db";
+import { getShopBySlug, listActiveBundles, rescueTotals } from "@/lib/db";
+import { impactOf } from "@/lib/impact";
 import { publicDealsUrl } from "@/lib/urls";
 
 type Ctx = { params: Promise<{ slug: string }> };
@@ -24,5 +25,7 @@ export async function GET(req: Request, { params }: Ctx) {
       available: avail.get(b.id)!.available,
     }))
     .filter((d) => d.available > 0);
-  return Response.json({ shop: { name: shop.name, publicUrl: publicDealsUrl(req, shop.slug) }, deals });
+  const rescued = await rescueTotals(shop.id);
+  const { kgRescued } = impactOf(rescued.rows, rescued.money, rescued.bundlesSold);
+  return Response.json({ shop: { name: shop.name, publicUrl: publicDealsUrl(req, shop.slug), kgRescued }, deals });
 }

@@ -54,6 +54,10 @@ Each café signs up with its shop name, email and password, and only ever sees i
 
 Staff photograph a supplier bill; Gemini returns each stock line as schema-checked JSON: a clean name, category, quantity converted to a sensible unit (2 trays of 30 eggs = 60 pcs), cost per unit, and a typical shelf life. Delivery charges and tax lines are skipped. Bills don't show selling prices or expiry dates, so the app suggests about twice cost and an estimated expiry, and **nothing is saved until staff review every line** in an editable table. The chosen lines are added in one transaction. Photos are shrunk in the browser before upload.
 
+### Impact numbers (`src/lib/impact.ts`)
+
+The dashboard shows food rescued (kg), CO₂ avoided and money recovered, this month and in total, with a **Share it** button that writes a WhatsApp message. Food sold by kg or litre counts as is; pieces and packs use a typical weight per category (e.g. 80 g for bakery, 250 g for prepared food). CO₂ uses about 2.5 kg CO₂e per kg of food not wasted, the FAO's global average for food waste. Both are labelled as estimates wherever they appear. The customer page shows the shop's total, and the homepage shows totals across all shops.
+
 ### Customer pre-orders
 
 On a shop's deals page, customers tap **Reserve for pickup**, enter a first name, and get a 4-digit pickup code. The bundle is held for 1 hour: it's subtracted from what's available to everyone else, and staff can't sell it to a walk-in at the till. Staff see the reservations at the top of **Bundles**, check the name and code, take payment and tap **Picked up**, which records the sale. Holds expire on their own; a late customer can still collect if stock is left.

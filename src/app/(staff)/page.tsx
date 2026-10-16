@@ -25,6 +25,63 @@ function Card({ label, value, note, tone = "" }: { label: string; value: string;
   );
 }
 
+type Impact = { kgRescued: number; co2Kg: number; moneyRecovered: number; bundlesSold: number };
+
+const kg = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(1)} t` : `${n.toLocaleString("en-IN")} kg`);
+
+/** Food rescued and CO2 avoided, this month and in total, with a ready-made message to share. */
+function ImpactSection() {
+  const [data, setData] = useState<{ month: Impact; allTime: Impact; shopName: string } | null>(null);
+  useEffect(() => {
+    Promise.all([api<{ month: Impact; allTime: Impact }>("/api/impact"), api<{ shop: { name: string } }>("/api/auth/me")]).then(
+      ([impact, me]) => setData({ ...impact, shopName: me.shop.name }),
+      () => setData(null),
+    );
+  }, []);
+  if (!data) return null;
+  const { month, allTime } = data;
+  const shareText =
+    `🌱 Since we started using ShelfLife, ${data.shopName} has rescued ${kg(allTime.kgRescued)} of food from the bin ` +
+    `by selling ${allTime.bundlesSold} rescue bundles. That's about ${kg(allTime.co2Kg)} of CO₂ avoided. ` +
+    `Ask about today's rescue deals! 🥐`;
+
+  return (
+    <section className="mt-8 rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-white p-5">
+      <div className="flex flex-wrap items-center gap-2">
+        <h2 className="font-semibold">🌱 Your impact</h2>
+        <a
+          href={`https://wa.me/?text=${encodeURIComponent(shareText)}`}
+          target="_blank"
+          rel="noreferrer"
+          className="ml-auto rounded-lg border border-emerald-300 bg-white px-3 py-1.5 text-sm font-medium text-emerald-800 hover:bg-emerald-50"
+        >
+          Share it
+        </a>
+      </div>
+      {allTime.bundlesSold === 0 ? (
+        <p className="mt-2 text-sm text-stone-600">Sell your first rescue bundle and your impact shows up here.</p>
+      ) : (
+        <div className="mt-4 grid gap-4 sm:grid-cols-3">
+          {[
+            ["Food rescued", kg(allTime.kgRescued), `${kg(month.kgRescued)} this month`],
+            ["CO₂ avoided", kg(allTime.co2Kg), `${kg(month.co2Kg)} this month`],
+            ["Money recovered", rupees(allTime.moneyRecovered), `${allTime.bundlesSold} bundles sold`],
+          ].map(([label, value, note]) => (
+            <div key={label}>
+              <div className="text-sm text-stone-500">{label}</div>
+              <div className="text-3xl font-semibold tabular-nums text-emerald-800">{value}</div>
+              <div className="text-sm text-stone-500">{note}</div>
+            </div>
+          ))}
+        </div>
+      )}
+      <p className="mt-4 text-xs text-stone-400">
+        Estimates: pieces and packs use a typical weight per category, and CO₂ uses about 2.5 kg per kg of food not wasted (FAO average).
+      </p>
+    </section>
+  );
+}
+
 function DailySummary() {
   const [text, setText] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -145,6 +202,7 @@ export default function Dashboard() {
         </p>
       )}
 
+      <ImpactSection />
       <DailySummary />
     </div>
   );

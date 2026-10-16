@@ -2,7 +2,7 @@ import { createClient, type Client, type InValue, type Transaction } from "@libs
 import { mkdirSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import path from "node:path";
-import { today, type Batch, type BatchInput, type Bundle, type BundleItem, type Outcome } from "./schema";
+import { today, type Batch, type BatchInput, type Bundle, type BundleItem, type Category, type Outcome, type Unit } from "./schema";
 
 // libSQL (SQLite-compatible). Locally it's a file in ./data with zero setup; in production,
 // TURSO_DATABASE_URL + TURSO_AUTH_TOKEN point it at a hosted Turso database. Every query lives in this file.
@@ -554,5 +554,37 @@ export async function listOpenReservations(shopId: string): Promise<Reservation[
 
 export async function setReservationStatus(shopId: string, id: string, status: Reservation["status"], db: Db = client) {
   await run("UPDATE reservations SET status = ? WHERE id = ? AND shop_id = ?", [status, id, shopId], db);
+}
+
+// ---- Impact ----
+
+/**
+ * Rescued quantities grouped by unit and category, plus bundle revenue and sales, since a date.
+ * shopId null = all shops together (for the public homepage counter).
+ */
+export async function rescueTotals(shopId: string | null, since = "0000") {
+  const shopFilter = shopId ? "AND b.shop_id = ?" : "";
+  const args = (extra: InValue[]) => (shopId ? [...extra, shopId] : extra);
+  const [rows, money] = await Promise.all([
+    all(
+      `SELECT b.unit, b.category, SUM(e.quantity) AS qty FROM events e JOIN batches b ON b.id = e.batch_id
+       WHERE e.outcome = 'rescued' AND e.at >= ? ${shopFilter} GROUP BY b.unit, b.category`,
+      args([since]),
+    ),
+    one(
+      `SELECT COALESCE(SUM(s.price), 0) AS total, COUNT(*) AS n FROM bundle_sales s JOIN bundles b ON b.id = s.bundle_id
+       WHERE s.at >= ? ${shopFilter}`,
+      args([since]),
+    ),
+  ]);
+  return {
+    rows: rows.map((r) => ({ unit: r.unit as Unit, category: r.category as Category, quantity: r.qty as number })),
+    money: (money?.total as number) ?? 0,
+    bundlesSold: (money?.n as number) ?? 0,
+  };
+}
+
+export async function countShops(): Promise<number> {
+  return ((await one("SELECT COUNT(*) AS n FROM shops"))?.n as number) ?? 0;
 }
 

@@ -3,6 +3,7 @@ import { z } from "zod";
 export const CATEGORIES = ["bakery", "dairy", "produce", "beverages", "prepared", "packaged"] as const;
 export const UNITS = ["pcs", "kg", "L", "pack"] as const;
 export type Category = (typeof CATEGORIES)[number];
+export type Unit = (typeof UNITS)[number];
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD");
 
