@@ -37,6 +37,7 @@ Each café signs up with its shop name, email and password, and only ever sees i
 | `/bundles` | Staff | Suggested rescue bundles to publish (price editable); live bundles with a *Sold 1* button for the till |
 | `/insights` | Owner | Ordering tips ("order 9 croissants, not 12"), waste by weekday, and where each item's stock goes |
 | `/poster` | Staff | Printable A4 poster with a QR code to the shop's deals page |
+| `/settings` | Owner | Shop name, the customer page link, and the ntfy topic for the morning summary |
 | `/s/<shop>` | Customers | Phone-friendly list of the shop's bundles today, with a *Share on WhatsApp* button |
 
 ### Rescue bundles (`src/lib/bundles.ts`)
@@ -57,16 +58,14 @@ Looks at finished batches (sold out or expired) from the last 28 days. For each 
 
 ### Daily summary
 
-Every morning the owner should know what expires today and tomorrow, what's already expired, and how many bundles are ready. The dashboard shows this summary with **Copy** and **Send on WhatsApp** buttons. To get it as a phone notification instead:
+Every morning the owner should know what expires today and tomorrow, what's already expired, and how many bundles are ready. The dashboard shows this summary with **Copy** and **Send on WhatsApp** buttons.
 
-1. Install the free [ntfy](https://ntfy.sh) app and subscribe to a long, hard-to-guess topic name (anyone who knows the name can read it).
-2. In `.env.local`, set `NTFY_TOPIC=...` to the same name, and `CRON_SECRET=...` to any long random string. Restart the app.
-3. Run `npm run summary -- --shop <your shop's link name>` while the app is running. It prints the summary and pushes it to your phone (high priority if something expires today).
-4. To get it every morning at 8:00, add a cron job (`crontab -e`):
-   ```
-   0 8 * * * cd ~/shelflife && npm run summary -- --shop cafe-mogra
-   ```
-   The app must be running at that time, e.g. on the shop's computer or a server.
+**As a phone notification** (free, via [ntfy](https://ntfy.sh)): in **Settings**, pick a hard-to-guess ntfy topic (or let the app make one), install the ntfy app and subscribe to the same topic. When deployed on Vercel, `vercel.json` runs `/api/cron/daily-summary` every day at 02:30 UTC (8:00 a.m. India time). It sends each shop with a topic its own summary, with high priority if something expires today. The route only runs with `Authorization: Bearer $CRON_SECRET`, which Vercel sends automatically.
+
+Running locally instead: set `CRON_SECRET` in `.env.local`, then `npm run summary -- --shop <your shop's link name>` prints a shop's summary (and pushes it if `NTFY_TOPIC` is set), e.g. from a cron job:
+```
+0 8 * * * cd ~/shelflife && npm run summary -- --shop cafe-mogra
+```
 
 ## Architecture
 
