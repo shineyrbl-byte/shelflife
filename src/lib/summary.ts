@@ -1,4 +1,4 @@
-import { suggestBundles } from "./bundles";
+import { notYetLive, suggestBundles } from "./bundles";
 import { bundleRevenue, listActiveBundles, listStock, outcomeTotals, type Shop } from "./db";
 import { daysLeft, freshness, rupees, today, type Batch } from "./schema";
 
@@ -20,7 +20,7 @@ export async function buildSummary(shop: Shop, appUrl: string, now = new Date())
   const expiringToday = stock.filter((b) => freshness(b.expiresOn, day) === "today");
   const tomorrow = stock.filter((b) => daysLeft(b.expiresOn, day) === 1);
   const expired = stock.filter((b) => freshness(b.expiresOn, day) === "expired");
-  const suggestions = suggestBundles(stock, day);
+  const suggestions = notYetLive(suggestBundles(stock, day), live);
 
   const atEnd = totals.wasted.quantity + totals.rescued.quantity;
   const rate = atEnd ? `, rescue rate ${Math.round((totals.rescued.quantity / atEnd) * 100)}%` : "";
