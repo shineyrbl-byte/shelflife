@@ -696,3 +696,37 @@ export async function countShops(): Promise<number> {
   return ((await one("SELECT COUNT(*) AS n FROM shops"))?.n as number) ?? 0;
 }
 
+// ---- Export ----
+
+/** Every unit that left the shop's stock between two ISO timestamps, oldest first. */
+export async function listActivity(shopId: string, fromIso: string, toIso: string) {
+  const rows = await all(
+    `SELECT e.at, e.outcome, e.quantity, b.name, b.category, b.unit, b.unit_cost, b.unit_price, b.expires_on, bu.title AS bundle_title
+     FROM events e JOIN batches b ON b.id = e.batch_id LEFT JOIN bundles bu ON bu.id = e.bundle_id
+     WHERE b.shop_id = ? AND e.at >= ? AND e.at < ? ORDER BY e.at`,
+    [shopId, fromIso, toIso],
+  );
+  return rows.map((r) => ({
+    at: r.at as string,
+    outcome: r.outcome as Outcome,
+    quantity: r.quantity as number,
+    name: r.name as string,
+    category: r.category as Category,
+    unit: r.unit as Unit,
+    unitCost: r.unit_cost as number,
+    unitPrice: r.unit_price as number,
+    expiresOn: r.expires_on as string,
+    bundleTitle: (r.bundle_title as string) ?? "",
+  }));
+}
+
+/** Bundle sales between two ISO timestamps, oldest first. */
+export async function listBundleSales(shopId: string, fromIso: string, toIso: string) {
+  const rows = await all(
+    `SELECT s.at, s.price, b.title, b.original_price FROM bundle_sales s JOIN bundles b ON b.id = s.bundle_id
+     WHERE b.shop_id = ? AND s.at >= ? AND s.at < ? ORDER BY s.at`,
+    [shopId, fromIso, toIso],
+  );
+  return rows.map((r) => ({ at: r.at as string, title: r.title as string, price: r.price as number, originalPrice: r.original_price as number }));
+}
+

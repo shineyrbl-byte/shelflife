@@ -57,6 +57,10 @@ Each café signs up with its shop name, email and password, and only ever sees i
 
 Staff photograph a supplier bill; Gemini returns each stock line as schema-checked JSON: a clean name, category, quantity converted to a sensible unit (2 trays of 30 eggs = 60 pcs), cost per unit, and a typical shelf life. Delivery charges and tax lines are skipped. Bills don't show selling prices or expiry dates, so the app suggests about twice cost and an estimated expiry, and **nothing is saved until staff review every line** in an editable table. The chosen lines are added in one transaction. Photos are shrunk in the browser before upload.
 
+### Export
+
+**Dashboard → Export for your accountant** downloads a month as CSV (opens in Excel or Google Sheets): **stock activity** (every unit sold, sold in a bundle, donated or wasted, with cost and normal price) and **bundle sales** (what customers paid). Times are in the shop's time zone (`APP_TIMEZONE`, default `Asia/Kolkata`). Cells that look like spreadsheet formulas are written as text, so a product name can't run code in Excel.
+
 ### Impact numbers (`src/lib/impact.ts`)
 
 The dashboard shows food rescued (kg), CO₂ avoided and money recovered, this month and in total, with a **Share it** button that writes a WhatsApp message. Food sold by kg or litre counts as is; pieces and packs use a typical weight per category (e.g. 80 g for bakery, 250 g for prepared food). CO₂ uses about 2.5 kg CO₂e per kg of food not wasted, the FAO's global average for food waste. Both are labelled as estimates wherever they appear. The customer page shows the shop's total, and the homepage shows totals across all shops.
