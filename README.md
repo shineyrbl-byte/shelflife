@@ -15,7 +15,7 @@ Optional: copy `.env.example` to `.env.local` and set:
 - `NEXT_PUBLIC_SHOP_NAME`: shown to customers.
 - `GEMINI_API_KEY`: a free key from [aistudio.google.com/apikey](https://aistudio.google.com/apikey) turns on **📷 Scan a bill** and **✨ Write with AI** for bundle names and descriptions.
 
-Everything else works without any keys or accounts, on local SQLite.
+Everything else works without any keys or accounts, on a local SQLite file.
 
 ## How it works
 
@@ -65,9 +65,10 @@ Next.js 16 (App Router, React 19, Tailwind 4)
 ├─ src/app/api/         stock, outcomes, bundles, suggestions, report
 ├─ src/lib/schema.ts    Zod input schemas, types, expiry helpers
 ├─ src/lib/bundles.ts   rescue bundle engine (pure functions)
-└─ src/lib/db.ts        node:sqlite, the only file that touches the database
+└─ src/lib/db.ts        libSQL (SQLite-compatible), the only file that touches the database
 ```
 
+- **Local file or hosted database, same code.** \`db.ts\` uses libSQL: a SQLite file in \`data/\` by default, or a hosted [Turso](https://turso.tech) database when \`TURSO_DATABASE_URL\` and \`TURSO_AUTH_TOKEN\` are set.
 - **Nothing derived is stored.** A batch's remaining stock = its quantity minus logged events (sold / wasted / rescued), so numbers can't drift out of sync.
 - **Money is valued two ways.** Waste is counted at cost (what the shop actually lost); bundle revenue is what customers paid.
 - **Server decides prices.** When a bundle is published, normal prices and expiry come from the stock records, not the browser.

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { aiEnabled, isBusyError, writeBundleCopy } from "@/lib/ai";
-import { getBatch } from "@/lib/db";
+import { getBatches } from "@/lib/db";
 import { readBody } from "@/lib/http";
 import type { Batch } from "@/lib/schema";
 
@@ -16,7 +16,8 @@ export async function POST(req: Request) {
   }
   const body = await readBody(req, Body);
   if (body instanceof Response) return body;
-  const batches = body.items.map((i) => getBatch(i.batchId));
+  const stock = await getBatches(body.items.map((i) => i.batchId));
+  const batches = body.items.map((i) => stock.get(i.batchId));
   if (batches.some((b) => !b)) return Response.json({ error: "An item in this bundle no longer exists." }, { status: 400 });
   const found = batches as Batch[];
   try {
