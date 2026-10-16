@@ -393,7 +393,7 @@ const hi: Record<Key, string> = {
   "join.submit": "{shop} से जुड़ें",
 };
 
-const DICTS: Record<Lang, Record<Key, string>> = { en, hi };
+export const DICTS: Record<Lang, Record<Key, string>> = { en, hi };
 const STORAGE_KEY = "sl-lang";
 const EVENT = "sl-lang-change";
 
