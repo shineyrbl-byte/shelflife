@@ -204,6 +204,16 @@ export async function getShopBySlug(slug: string): Promise<Shop | null> {
   return r ? toShop(r) : null;
 }
 
+export async function updateShop(id: string, patch: { name?: string; ntfyTopic?: string | null }) {
+  if (patch.name !== undefined) await run("UPDATE shops SET name = ? WHERE id = ?", [patch.name, id]);
+  if (patch.ntfyTopic !== undefined) await run("UPDATE shops SET ntfy_topic = ? WHERE id = ?", [patch.ntfyTopic, id]);
+}
+
+/** Shops that want the daily summary pushed to their phones. */
+export async function listShopsWithNtfy(): Promise<Shop[]> {
+  return (await all("SELECT * FROM shops WHERE ntfy_topic IS NOT NULL AND ntfy_topic != ''")).map(toShop);
+}
+
 export async function insertSession(tokenHash: string, userId: string, expiresAt: string) {
   await run("INSERT INTO sessions (token_hash, user_id, expires_at) VALUES (?, ?, ?)", [tokenHash, userId, expiresAt]);
 }
