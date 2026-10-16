@@ -89,6 +89,12 @@ export function insertBatch(input: BatchInput, addedOn = today()): string {
   return id;
 }
 
+export function updateBatch(id: string, input: BatchInput) {
+  db.prepare(
+    `UPDATE batches SET name = ?, category = ?, unit = ?, quantity = ?, unit_cost = ?, unit_price = ?, expires_on = ? WHERE id = ?`,
+  ).run(input.name, input.category, input.unit, input.quantity, input.unitCost, input.unitPrice, input.expiresOn, id);
+}
+
 export function getBatch(id: string): Batch | null {
   const r = db.prepare(`${BATCH_SELECT} WHERE b.id = ?`).get(id) as Row | undefined;
   return r ? toBatch(r) : null;
