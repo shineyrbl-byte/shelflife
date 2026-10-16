@@ -42,6 +42,19 @@ const SCHEMA = `
     user_id TEXT NOT NULL REFERENCES users(id),
     expires_at TEXT NOT NULL
   );
+  -- What the shop knows about each barcode, so scanning a known item fills in the details.
+  CREATE TABLE IF NOT EXISTS products (
+    shop_id TEXT NOT NULL REFERENCES shops(id),
+    barcode TEXT NOT NULL,
+    name TEXT NOT NULL,
+    category TEXT NOT NULL,
+    unit TEXT NOT NULL,
+    unit_cost REAL NOT NULL,
+    unit_price REAL NOT NULL,
+    shelf_life_days INTEGER NOT NULL,
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (shop_id, barcode)
+  );
   CREATE TABLE IF NOT EXISTS batches (
     id TEXT PRIMARY KEY,
     shop_id TEXT REFERENCES shops(id),
@@ -236,6 +249,35 @@ export async function findSession(tokenHash: string): Promise<{ user: User; shop
 
 export async function deleteSession(tokenHash: string) {
   await run("DELETE FROM sessions WHERE token_hash = ? OR expires_at <= ?", [tokenHash, new Date().toISOString()]);
+}
+
+// ---- Products (barcodes) ----
+
+export type Product = Pick<Batch, "name" | "category" | "unit" | "unitCost" | "unitPrice"> & { barcode: string; shelfLifeDays: number };
+
+export async function getProduct(shopId: string, barcode: string): Promise<Product | null> {
+  const r = await one("SELECT * FROM products WHERE shop_id = ? AND barcode = ?", [shopId, barcode]);
+  if (!r) return null;
+  return {
+    barcode,
+    name: r.name as string,
+    category: r.category as Product["category"],
+    unit: r.unit as Product["unit"],
+    unitCost: r.unit_cost as number,
+    unitPrice: r.unit_price as number,
+    shelfLifeDays: r.shelf_life_days as number,
+  };
+}
+
+/** Remembers (or updates) what a barcode is, from the latest stock added with it. */
+export async function saveProduct(shopId: string, p: Product) {
+  await run(
+    `INSERT INTO products (shop_id, barcode, name, category, unit, unit_cost, unit_price, shelf_life_days, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT (shop_id, barcode) DO UPDATE SET name = excluded.name, category = excluded.category, unit = excluded.unit,
+       unit_cost = excluded.unit_cost, unit_price = excluded.unit_price, shelf_life_days = excluded.shelf_life_days, updated_at = excluded.updated_at`,
+    [shopId, p.barcode, p.name, p.category, p.unit, p.unitCost, p.unitPrice, p.shelfLifeDays, new Date().toISOString()],
+  );
 }
 
 // ---- Batches ----
