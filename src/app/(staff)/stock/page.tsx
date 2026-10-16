@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "@/lib/client";
 import ScanBill from "./ScanBill";
+import BarcodeScanner from "./BarcodeScanner";
 import { CATEGORIES, UNITS, expiryLabel, rupees, today, type Batch, type BatchInput, type Freshness } from "@/lib/schema";
 
 type StockRow = Batch & { daysLeft: number; freshness: Freshness };
@@ -16,19 +17,63 @@ const GROUPS: { key: Freshness; title: string; tone: string; dot: string }[] = [
 
 const plusDays = (n: number) => today(new Date(Date.now() + n * 86400000));
 
-const emptyForm = () => ({ name: "", category: "bakery", unit: "pcs", quantity: "", unitCost: "", unitPrice: "", expiresOn: plusDays(1) });
+const emptyForm = () => ({ barcode: "", name: "", category: "bakery", unit: "pcs", quantity: "", unitCost: "", unitPrice: "", expiresOn: plusDays(1) });
 type FormState = ReturnType<typeof emptyForm>;
 
 function AddBatchForm({ onAdded }: { onAdded: () => void }) {
   const [form, setForm] = useState(emptyForm);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [scanning, setScanning] = useState(false);
+  const [lookup, setLookup] = useState<{ tone: "ok" | "info"; text: string } | null>(null);
   const set = (k: keyof FormState) => (e: { target: { value: string } }) => setForm({ ...form, [k]: e.target.value });
+  const quantityRef = useRef<HTMLInputElement>(null);
+  const nameRef = useRef<HTMLInputElement>(null);
+
+  /** Fills the form from what the shop (or Open Food Facts) knows about a barcode. */
+  const lookUp = useCallback(async (raw: string) => {
+    const barcode = raw.trim();
+    setScanning(false);
+    if (!barcode) return;
+    setError("");
+    setLookup({ tone: "info", text: "Looking up barcode…" });
+    try {
+      const p = await api<{ source: "shop" | "openfoodfacts" | "none"; name?: string; category?: string; unit?: string; unitCost?: number; unitPrice?: number; expiresOn?: string }>(
+        `/api/products/${encodeURIComponent(barcode)}`,
+      );
+      setForm((f) => ({
+        ...f,
+        barcode,
+        ...(p.source === "shop"
+          ? { name: p.name!, category: p.category!, unit: p.unit!, unitCost: String(p.unitCost), unitPrice: String(p.unitPrice), expiresOn: p.expiresOn! }
+          : p.source === "openfoodfacts"
+            ? { name: p.name!, category: p.category!, unitCost: "", unitPrice: "" }
+            : { name: "", unitCost: "", unitPrice: "" }),
+      }));
+      if (p.source === "shop") {
+        setLookup({ tone: "ok", text: `${p.name}: details filled in from last time. Enter the quantity and check the expiry date.` });
+        setTimeout(() => quantityRef.current?.focus(), 0);
+      } else {
+        setLookup({
+          tone: "info",
+          text:
+            p.source === "openfoodfacts"
+              ? `Found "${p.name}" on Open Food Facts. Add the prices once and it'll be remembered.`
+              : "New barcode. Fill in the details once and ShelfLife will remember them next time.",
+        });
+        setTimeout(() => (p.source === "none" ? nameRef : quantityRef).current?.focus(), 0);
+      }
+    } catch (err) {
+      setLookup(null);
+      setError((err as Error).message);
+    }
+  }, []);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
-    const body: BatchInput = {
+    const body: BatchInput & { barcode?: string } = {
+      ...(form.barcode.trim() ? { barcode: form.barcode.trim() } : {}),
       name: form.name.trim(),
       category: form.category as BatchInput["category"],
       unit: form.unit as BatchInput["unit"],
@@ -43,7 +88,8 @@ function AddBatchForm({ onAdded }: { onAdded: () => void }) {
     try {
       await api("/api/stock", { method: "POST", body: JSON.stringify(body) });
       // Keep category, unit and expiry: deliveries usually come in several similar items.
-      setForm({ ...form, name: "", quantity: "", unitCost: "", unitPrice: "" });
+      setForm({ ...form, barcode: "", name: "", quantity: "", unitCost: "", unitPrice: "" });
+      setLookup(null);
       onAdded();
     } catch (err) {
       setError((err as Error).message);
@@ -56,11 +102,36 @@ function AddBatchForm({ onAdded }: { onAdded: () => void }) {
   return (
     <form onSubmit={submit} className="rounded-2xl border border-stone-200 bg-white p-5">
       <h2 className="font-semibold">Add stock</h2>
-      <p className="text-sm text-stone-500">One line per delivery or bake, with its expiry date.</p>
+      <p className="text-sm text-stone-500">One line per delivery or bake, with its expiry date. Packaged goods: scan the barcode first.</p>
+      <div className="mt-4 flex flex-wrap items-end gap-2">
+        <label className="text-xs text-stone-500">
+          Barcode (optional)
+          <input
+            className={`${input} w-48`}
+            inputMode="numeric"
+            placeholder="Scan or type, then Enter"
+            value={form.barcode}
+            onChange={set("barcode")}
+            onKeyDown={(e) => {
+              // USB/Bluetooth scanners type the code and press Enter.
+              if (e.key === "Enter") {
+                e.preventDefault();
+                lookUp(form.barcode);
+              }
+            }}
+            onBlur={() => form.barcode.trim() && !form.name && lookUp(form.barcode)}
+          />
+        </label>
+        <button type="button" onClick={() => setScanning(true)} className="rounded-lg border border-stone-300 px-3 py-2 text-sm hover:bg-stone-50">
+          📷 Scan barcode
+        </button>
+        {lookup && <p className={`basis-full text-sm ${lookup.tone === "ok" ? "text-emerald-700" : "text-stone-600"}`}>{lookup.text}</p>}
+      </div>
+      {scanning && <BarcodeScanner onCode={lookUp} onClose={() => setScanning(false)} />}
       <div className="mt-4 grid gap-3 sm:grid-cols-6">
         <label className="sm:col-span-2 text-xs text-stone-500">
           Item
-          <input className={input} placeholder="e.g. Croissant" value={form.name} onChange={set("name")} />
+          <input ref={nameRef} className={input} placeholder="e.g. Croissant" value={form.name} onChange={set("name")} />
         </label>
         <label className="text-xs text-stone-500">
           Category
@@ -71,7 +142,7 @@ function AddBatchForm({ onAdded }: { onAdded: () => void }) {
         <label className="text-xs text-stone-500">
           Quantity
           <div className="flex gap-1">
-            <input className={input} inputMode="decimal" placeholder="12" value={form.quantity} onChange={set("quantity")} />
+            <input ref={quantityRef} className={input} inputMode="decimal" placeholder="12" value={form.quantity} onChange={set("quantity")} />
             <select className="rounded-lg border border-stone-300 bg-white px-1 text-sm" value={form.unit} onChange={set("unit")}>
               {UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
             </select>

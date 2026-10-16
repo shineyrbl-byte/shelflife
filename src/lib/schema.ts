@@ -19,6 +19,9 @@ export const BatchInputSchema = z.object({
 });
 export type BatchInput = z.infer<typeof BatchInputSchema>;
 
+/** EAN/UPC barcodes are digits; some shop labels use letters too. */
+export const BarcodeSchema = z.string().trim().regex(/^[0-9A-Za-z-]{4,32}$/, "That doesn't look like a barcode");
+
 export type Batch = BatchInput & {
   id: string;
   addedOn: string;

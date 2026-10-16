@@ -54,6 +54,10 @@ Each café signs up with its shop name, email and password, and only ever sees i
 
 Staff photograph a supplier bill; Gemini returns each stock line as schema-checked JSON: a clean name, category, quantity converted to a sensible unit (2 trays of 30 eggs = 60 pcs), cost per unit, and a typical shelf life. Delivery charges and tax lines are skipped. Bills don't show selling prices or expiry dates, so the app suggests about twice cost and an estimated expiry, and **nothing is saved until staff review every line** in an editable table. The chosen lines are added in one transaction. Photos are shrunk in the browser before upload.
 
+### Barcode scanning
+
+On the Stock page, **📷 Scan barcode** reads EAN/UPC codes with the phone camera ([ZXing](https://github.com/zxing-js/browser), loaded only when the scanner opens); USB or Bluetooth scanners work too, since they type the code and press Enter. ShelfLife remembers each shop's barcodes (name, category, unit, prices and typical shelf life), so the next scan fills everything in and staff only enter the quantity. Unknown barcodes are looked up on [Open Food Facts](https://world.openfoodfacts.org) (free, no key) for the name and a category guess. The camera needs HTTPS, which the deployed site has (or localhost).
+
 ### Ordering tips (`src/lib/insights.ts`)
 
 Looks at finished batches (sold out or expired) from the last 28 days. For each item with at least 3 batches where 15% or more didn't sell at full price, it suggests ordering the amount that sold at full price on 80% of batches. That still covers demand on about 4 days in 5, so the shop runs out occasionally instead of binning stock daily. The saving shown is the cost of the units no longer over-ordered, capped at what was actually left over.
