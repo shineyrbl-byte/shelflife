@@ -29,7 +29,7 @@ async function openFoodFacts(barcode: string) {
     if (!p?.product_name) return null;
     const brand = String(p.brands ?? "").split(",")[0].trim();
     // Drop the EU "estimated weight" mark (℮, often typed as "e") from quantities like "400 g e".
-    const quantity = String(p.quantity ?? "").replace(/\s*(℮|e)$/i, "");
+    const quantity = String(p.quantity ?? "").replace(/\s*℮$|\s+e$/i, "");
     const name = [brand && !p.product_name.toLowerCase().includes(brand.toLowerCase()) ? brand : "", p.product_name, quantity]
       .filter(Boolean)
       .join(" ")
