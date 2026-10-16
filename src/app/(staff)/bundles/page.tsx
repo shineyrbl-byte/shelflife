@@ -6,7 +6,50 @@ import { api } from "@/lib/client";
 import { notYetLive, type BundleSuggestion } from "@/lib/bundles";
 import { expiryLabel, rupees, type Bundle } from "@/lib/schema";
 
-type LiveBundle = Bundle & { available: number };
+type LiveBundle = Bundle & { available: number; held: number };
+type Reservation = { id: string; bundleTitle: string; price: number; customerName: string; code: string; expiresAt: string; expired: boolean };
+
+const timeLabel = (iso: string) => new Date(iso).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" });
+
+/** Customer pre-orders waiting at the counter. Matching the 4-digit code confirms it's the right person. */
+function Reservations({ list, onChange }: { list: Reservation[]; onChange: () => void }) {
+  const [error, setError] = useState("");
+  if (!list.length) return null;
+  const act = (id: string, action: "collect" | "cancel") =>
+    api(`/api/reservations/${id}/${action}`, { method: "POST" }).then(
+      () => {
+        setError("");
+        onChange();
+      },
+      (err) => setError(err.message),
+    );
+  return (
+    <section className="mt-6">
+      <h2 className="font-semibold">Reservations to pick up</h2>
+      <p className="text-sm text-stone-500">Ask for the name and the 4-digit code, then take payment and tap Picked up.</p>
+      <ul className="mt-3 divide-y divide-stone-200 rounded-2xl border border-emerald-200 bg-emerald-50/40">
+        {list.map((r) => (
+          <li key={r.id} className={`flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 ${r.expired ? "opacity-60" : ""}`}>
+            <div className="w-16 text-2xl font-bold tracking-widest tabular-nums">{r.code}</div>
+            <div className="min-w-40 flex-1">
+              <div className="font-medium">{r.customerName}</div>
+              <div className="text-xs text-stone-500">
+                {r.bundleTitle} · {rupees(r.price)} · {r.expired ? `hold ended at ${timeLabel(r.expiresAt)}` : `pick up by ${timeLabel(r.expiresAt)}`}
+              </div>
+            </div>
+            <button onClick={() => act(r.id, "collect")} className="rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-700">
+              Picked up
+            </button>
+            <button onClick={() => act(r.id, "cancel")} className="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm hover:bg-stone-50">
+              {r.expired ? "Clear" : "Cancel"}
+            </button>
+          </li>
+        ))}
+      </ul>
+      {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
+    </section>
+  );
+}
 
 const itemsText = (items: { name: string; quantity: number; unit: string }[]) =>
   items.map((i) => `${i.quantity} ${i.unit} ${i.name}`).join(" + ");
@@ -131,7 +174,7 @@ function LiveBundleRow({ b, onChange }: { b: LiveBundle; onChange: () => void })
           {rupees(b.price)} <span className="text-xs font-normal text-stone-400 line-through">{rupees(b.originalPrice)}</span>
         </div>
         <div className="text-xs text-stone-500">
-          {b.soldCount} sold · {b.available} left
+          {b.soldCount} sold · {b.available} left{b.held ? ` · ${b.held} reserved` : ""}
         </div>
       </div>
       <button
@@ -152,13 +195,18 @@ function LiveBundleRow({ b, onChange }: { b: LiveBundle; onChange: () => void })
 export default function BundlesPage() {
   const [suggestions, setSuggestions] = useState<BundleSuggestion[] | null>(null);
   const [live, setLive] = useState<LiveBundle[]>([]);
+  const [reservations, setReservations] = useState<Reservation[]>([]);
 
   const load = useCallback(() => {
     api<LiveBundle[]>("/api/bundles").then(setLive, () => setLive([]));
+    api<Reservation[]>("/api/reservations").then(setReservations, () => setReservations([]));
     api<BundleSuggestion[]>("/api/bundles/suggestions").then(setSuggestions, () => setSuggestions([]));
   }, []);
   useEffect(() => {
     load();
+    // New customer reservations show up without reloading.
+    const t = setInterval(load, 20000);
+    return () => clearInterval(t);
   }, [load]);
 
   // The API already leaves out suggestions that are on sale; this also hides one the moment it's published.
@@ -171,6 +219,8 @@ export default function BundlesPage() {
       <p className="text-sm text-stone-500">
         Turn stock that expires in the next 2 days into discounted bundles, instead of throwing it away.
       </p>
+
+      <Reservations list={reservations} onChange={load} />
 
       <section className="mt-6">
         <h2 className="font-semibold">On sale now</h2>
