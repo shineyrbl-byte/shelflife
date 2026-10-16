@@ -3,16 +3,17 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { LanguageSwitch, useT, type Key } from "@/lib/i18n";
 
 type Me = { email: string; name: string; role: "owner" | "staff"; shop: { name: string; slug: string; publicUrl: string } };
 
-const NAV: { href: string; label: string; ownerOnly?: boolean }[] = [
-  { href: "/dashboard", label: "Dashboard", ownerOnly: true },
-  { href: "/stock", label: "Stock" },
-  { href: "/bundles", label: "Bundles" },
-  { href: "/insights", label: "Insights", ownerOnly: true },
-  { href: "/poster", label: "Poster" },
-  { href: "/settings", label: "Settings", ownerOnly: true },
+const NAV: { href: string; label: Key; ownerOnly?: boolean }[] = [
+  { href: "/dashboard", label: "nav.dashboard", ownerOnly: true },
+  { href: "/stock", label: "nav.stock" },
+  { href: "/bundles", label: "nav.bundles" },
+  { href: "/insights", label: "nav.insights", ownerOnly: true },
+  { href: "/poster", label: "nav.poster" },
+  { href: "/settings", label: "nav.settings", ownerOnly: true },
 ];
 
 /**
@@ -23,6 +24,7 @@ export default function StaffHeader() {
   const router = useRouter();
   const pathname = usePathname();
   const [me, setMe] = useState<Me | null>(null);
+  const { t } = useT();
 
   useEffect(() => {
     fetch("/api/auth/me")
@@ -53,13 +55,13 @@ export default function StaffHeader() {
           {me &&
             NAV.filter((n) => !(isStaff && n.ownerOnly)).map((n) => (
               <Link key={n.href} href={n.href} className={pathname.startsWith(n.href) ? "font-medium text-stone-900" : "hover:text-stone-900"}>
-                {n.label}
+                {t(n.label)}
               </Link>
             ))}
           {me && (
             <>
               <a href={me.shop.publicUrl} target="_blank" rel="noreferrer" className="rounded-lg bg-emerald-600 px-3.5 py-1.5 font-medium text-white hover:bg-emerald-700">
-                Customer deals ↗
+                {t("nav.customerDeals")}
               </a>
               <div className="flex items-center gap-2 border-l border-stone-200 pl-4">
                 <span className="max-w-36 truncate font-medium text-stone-800" title={me.email}>
@@ -67,8 +69,9 @@ export default function StaffHeader() {
                   {me.shop.name}
                 </span>
                 <button onClick={logout} className="text-stone-500 hover:text-stone-900">
-                  Log out
+                  {t("nav.logout")}
                 </button>
+                <LanguageSwitch />
               </div>
             </>
           )}

@@ -4,15 +4,15 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { api } from "@/lib/client";
 import { notYetLive, type BundleSuggestion } from "@/lib/bundles";
-import { expiryLabel, rupees, type Bundle } from "@/lib/schema";
+import { useT } from "@/lib/i18n";
+import { rupees, type Bundle } from "@/lib/schema";
 
 type LiveBundle = Bundle & { available: number; held: number };
 type Reservation = { id: string; bundleTitle: string; price: number; customerName: string; code: string; expiresAt: string; expired: boolean };
 
-const timeLabel = (iso: string) => new Date(iso).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" });
-
 /** Customer pre-orders waiting at the counter. Matching the 4-digit code confirms it's the right person. */
 function Reservations({ list, onChange }: { list: Reservation[]; onChange: () => void }) {
+  const { t, time } = useT();
   const [error, setError] = useState("");
   if (!list.length) return null;
   const act = (id: string, action: "collect" | "cancel") =>
@@ -25,8 +25,8 @@ function Reservations({ list, onChange }: { list: Reservation[]; onChange: () =>
     );
   return (
     <section className="mt-6">
-      <h2 className="font-semibold">Reservations to pick up</h2>
-      <p className="text-sm text-stone-500">Ask for the name and the 4-digit code, then take payment and tap Picked up.</p>
+      <h2 className="font-semibold">{t("bundles.reservations")}</h2>
+      <p className="text-sm text-stone-500">{t("bundles.reservationsHint")}</p>
       <ul className="mt-3 divide-y divide-stone-200 rounded-2xl border border-emerald-200 bg-emerald-50/40">
         {list.map((r) => (
           <li key={r.id} className={`flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 ${r.expired ? "opacity-60" : ""}`}>
@@ -34,14 +34,14 @@ function Reservations({ list, onChange }: { list: Reservation[]; onChange: () =>
             <div className="min-w-40 flex-1">
               <div className="font-medium">{r.customerName}</div>
               <div className="text-xs text-stone-500">
-                {r.bundleTitle} · {rupees(r.price)} · {r.expired ? `hold ended at ${timeLabel(r.expiresAt)}` : `pick up by ${timeLabel(r.expiresAt)}`}
+                {r.bundleTitle} · {rupees(r.price)} · {r.expired ? t("bundles.holdEnded", { time: time(r.expiresAt) }) : t("bundles.pickUpBy", { time: time(r.expiresAt) })}
               </div>
             </div>
             <button onClick={() => act(r.id, "collect")} className="rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-700">
-              Picked up
+              {t("bundles.pickedUp")}
             </button>
             <button onClick={() => act(r.id, "cancel")} className="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm hover:bg-stone-50">
-              {r.expired ? "Clear" : "Cancel"}
+              {r.expired ? t("bundles.clear") : t("common.cancel")}
             </button>
           </li>
         ))}
@@ -51,10 +51,11 @@ function Reservations({ list, onChange }: { list: Reservation[]; onChange: () =>
   );
 }
 
-const itemsText = (items: { name: string; quantity: number; unit: string }[]) =>
-  items.map((i) => `${i.quantity} ${i.unit} ${i.name}`).join(" + ");
+const itemsText = (items: { name: string; quantity: number; unit: string }[], unit: (u: string) => string) =>
+  items.map((i) => `${i.quantity} ${unit(i.unit)} ${i.name}`).join(" + ");
 
 function SuggestionCard({ s, onPublished }: { s: BundleSuggestion; onPublished: () => void }) {
+  const { t, unit, when } = useT();
   const [price, setPrice] = useState(String(s.price));
   const [title, setTitle] = useState(s.title);
   const [description, setDescription] = useState(s.description);
@@ -105,16 +106,16 @@ function SuggestionCard({ s, onPublished }: { s: BundleSuggestion; onPublished: 
 
   return (
     <div className="flex flex-col rounded-2xl border border-stone-200 bg-white p-5">
-      <div className="text-xs font-medium uppercase tracking-wide text-orange-600">Expires {expiryLabel(s.expiresOn)}</div>
+      <div className="text-xs font-medium uppercase tracking-wide text-orange-600">{t("bundles.expires", { when: when(s.expiresOn) })}</div>
       <input
-        aria-label="Bundle name"
+        aria-label={t("bundles.nameLabel")}
         value={title}
         onChange={(e) => setTitle(e.target.value)}
         className="-mx-1 mt-1 rounded px-1 font-semibold hover:bg-stone-50 focus:bg-stone-50 focus:outline-none"
       />
-      <p className="mt-1 text-sm text-stone-500">{itemsText(s.items)}</p>
+      <p className="mt-1 text-sm text-stone-500">{itemsText(s.items, unit)}</p>
       <textarea
-        aria-label="Description for customers"
+        aria-label={t("bundles.descLabel")}
         rows={3}
         value={description}
         onChange={(e) => setDescription(e.target.value)}
@@ -126,7 +127,7 @@ function SuggestionCard({ s, onPublished }: { s: BundleSuggestion; onPublished: 
         disabled={writing}
         className="mt-1.5 self-start text-xs font-medium text-violet-700 hover:underline disabled:opacity-50"
       >
-        {writing ? "Writing…" : "✨ Write with AI"}
+        {writing ? t("bundles.writing") : t("bundles.writeAi")}
       </button>
       <div className="mt-4 flex items-end gap-3">
         <div>
@@ -134,7 +135,7 @@ function SuggestionCard({ s, onPublished }: { s: BundleSuggestion; onPublished: 
           <label className="flex items-center gap-1 text-lg font-semibold">
             ₹
             <input
-              aria-label="Bundle price"
+              aria-label={t("bundles.priceLabel")}
               inputMode="decimal"
               value={price}
               onChange={(e) => setPrice(e.target.value)}
@@ -142,15 +143,15 @@ function SuggestionCard({ s, onPublished }: { s: BundleSuggestion; onPublished: 
             />
           </label>
         </div>
-        <div className="pb-1.5 text-sm text-emerald-700">{off > 0 ? `${off}% off` : ""}</div>
-        <div className="ml-auto pb-1.5 text-xs text-stone-500">enough for {s.available}</div>
+        <div className="pb-1.5 text-sm text-emerald-700">{off > 0 ? t("bundles.off", { n: off }) : ""}</div>
+        <div className="ml-auto pb-1.5 text-xs text-stone-500">{t("bundles.enoughFor", { n: s.available })}</div>
       </div>
       <button
         onClick={publish}
         disabled={busy || !(p > 0) || p > s.originalPrice}
         className="mt-4 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
       >
-        {busy ? "Publishing…" : "Publish to customer deals"}
+        {busy ? t("bundles.publishing") : t("bundles.publish")}
       </button>
       {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
     </div>
@@ -158,6 +159,7 @@ function SuggestionCard({ s, onPublished }: { s: BundleSuggestion; onPublished: 
 }
 
 function LiveBundleRow({ b, onChange }: { b: LiveBundle; onChange: () => void }) {
+  const { t, unit, when } = useT();
   const [error, setError] = useState("");
   const act = (url: string, method: string) => api(url, { method }).then(onChange, (err) => setError(err.message));
 
@@ -166,7 +168,7 @@ function LiveBundleRow({ b, onChange }: { b: LiveBundle; onChange: () => void })
       <div className="min-w-48 flex-1">
         <div className="font-medium">{b.title}</div>
         <div className="text-xs text-stone-500">
-          {itemsText(b.items)} · until {expiryLabel(b.expiresOn)}
+          {itemsText(b.items, unit)} · {t("bundles.until", { when: when(b.expiresOn) })}
         </div>
       </div>
       <div className="text-right">
@@ -174,7 +176,8 @@ function LiveBundleRow({ b, onChange }: { b: LiveBundle; onChange: () => void })
           {rupees(b.price)} <span className="text-xs font-normal text-stone-400 line-through">{rupees(b.originalPrice)}</span>
         </div>
         <div className="text-xs text-stone-500">
-          {b.soldCount} sold · {b.available} left{b.held ? ` · ${b.held} reserved` : ""}
+          {t("bundles.stats", { sold: b.soldCount, left: b.available })}
+          {b.held ? t("bundles.reserved", { n: b.held }) : ""}
         </div>
       </div>
       <button
@@ -182,10 +185,10 @@ function LiveBundleRow({ b, onChange }: { b: LiveBundle; onChange: () => void })
         disabled={b.available < 1}
         className="rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
       >
-        Sold 1
+        {t("bundles.sold1")}
       </button>
       <button onClick={() => act(`/api/bundles/${b.id}`, "DELETE")} className="rounded-lg border border-stone-300 px-3 py-1.5 text-sm hover:bg-stone-50">
-        Take down
+        {t("bundles.takeDown")}
       </button>
       {error && <p className="w-full text-xs text-red-600">{error}</p>}
     </li>
@@ -193,6 +196,7 @@ function LiveBundleRow({ b, onChange }: { b: LiveBundle; onChange: () => void })
 }
 
 export default function BundlesPage() {
+  const { t } = useT();
   const [suggestions, setSuggestions] = useState<BundleSuggestion[] | null>(null);
   const [live, setLive] = useState<LiveBundle[]>([]);
   const [reservations, setReservations] = useState<Reservation[]>([]);
@@ -215,17 +219,15 @@ export default function BundlesPage() {
 
   return (
     <div className="mx-auto max-w-5xl px-5 py-8">
-      <h1 className="text-2xl font-semibold tracking-tight">Rescue bundles</h1>
-      <p className="text-sm text-stone-500">
-        Turn stock that expires in the next 2 days into discounted bundles, instead of throwing it away.
-      </p>
+      <h1 className="text-2xl font-semibold tracking-tight">{t("bundles.title")}</h1>
+      <p className="text-sm text-stone-500">{t("bundles.subtitle")}</p>
 
       <Reservations list={reservations} onChange={load} />
 
       <section className="mt-6">
-        <h2 className="font-semibold">On sale now</h2>
+        <h2 className="font-semibold">{t("bundles.onSale")}</h2>
         {live.length === 0 ? (
-          <p className="mt-2 text-sm text-stone-500">Nothing on sale yet. Publish a suggestion below.</p>
+          <p className="mt-2 text-sm text-stone-500">{t("bundles.nothingOnSale")}</p>
         ) : (
           <ul className="mt-3 divide-y divide-stone-200 rounded-2xl border border-stone-200 bg-white">
             {live.map((b) => <LiveBundleRow key={b.id} b={b} onChange={load} />)}
@@ -234,14 +236,12 @@ export default function BundlesPage() {
       </section>
 
       <section className="mt-8">
-        <h2 className="font-semibold">Suggested bundles</h2>
-        <p className="text-sm text-stone-500">
-          Paired by what people buy together, discounted by how soon they expire, and never priced below cost. You can edit the price.
-        </p>
-        {fresh === undefined && <p className="mt-6 text-stone-500">Finding bundles…</p>}
+        <h2 className="font-semibold">{t("bundles.suggested")}</h2>
+        <p className="text-sm text-stone-500">{t("bundles.suggestedHint")}</p>
+        {fresh === null && <p className="mt-6 text-stone-500">{t("bundles.finding")}</p>}
         {fresh?.length === 0 && (
           <p className="mt-4 rounded-2xl border border-dashed border-stone-300 p-6 text-center text-sm text-stone-500">
-            Nothing needs rescuing right now. Items expiring within 2 days will show up here. <Link href="/stock" className="text-emerald-700 underline">Check stock</Link>
+            {t("bundles.nothingToRescue")} <Link href="/stock" className="text-emerald-700 underline">{t("bundles.checkStock")}</Link>
           </p>
         )}
         <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
