@@ -34,7 +34,8 @@ export default function DealsPage() {
   return (
     <div className="mx-auto max-w-xl px-5 py-8">
       <p className="flex items-center gap-2 text-sm font-medium text-emerald-700">
-        <span className="grid h-6 w-6 place-items-center rounded-md bg-emerald-600 text-xs text-white">⏳</span>
+        {/* eslint-disable-next-line @next/next/no-img-element -- tiny static icon */}
+        <img src="/icon-192.png" alt="" className="h-6 w-6 rounded-md" />
         Rescue deals at {SHOP}
       </p>
       <h1 className="mt-1 text-3xl font-semibold tracking-tight">Good food, less waste</h1>
