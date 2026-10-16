@@ -1,5 +1,5 @@
 import { suggestBundles } from "./bundles";
-import { bundleRevenue, listActiveBundles, listStock, outcomeTotals } from "./db";
+import { bundleRevenue, listActiveBundles, listStock, outcomeTotals, type Shop } from "./db";
 import { daysLeft, freshness, rupees, today, type Batch } from "./schema";
 
 // The owner's morning summary: what expires today and tomorrow, what's already expired,
@@ -13,10 +13,10 @@ function section(icon: string, label: string, batches: Batch[], suffix = "") {
   return `${icon} ${label} (${rupees(costOf(batches))} at cost${suffix}):\n${batches.map((b) => `  • ${qty(b)}`).join("\n")}`;
 }
 
-export async function buildSummary(appUrl: string, now = new Date()) {
+export async function buildSummary(shop: Shop, appUrl: string, now = new Date()) {
   const day = today(now);
   const since = today(new Date(now.getTime() - 6 * 86400000));
-  const [stock, live, totals, rescued] = await Promise.all([listStock(), listActiveBundles(), outcomeTotals(since), bundleRevenue(since)]);
+  const [stock, live, totals, rescued] = await Promise.all([listStock(shop.id), listActiveBundles(shop.id), outcomeTotals(shop.id, since), bundleRevenue(shop.id, since)]);
   const expiringToday = stock.filter((b) => freshness(b.expiresOn, day) === "today");
   const tomorrow = stock.filter((b) => daysLeft(b.expiresOn, day) === 1);
   const expired = stock.filter((b) => freshness(b.expiresOn, day) === "expired");
@@ -27,7 +27,7 @@ export async function buildSummary(appUrl: string, now = new Date()) {
 
   const dateLabel = new Date(day + "T00:00:00").toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "short" });
   const parts = [
-    `ShelfLife summary, ${dateLabel}`,
+    `${shop.name}: ShelfLife summary, ${dateLabel}`,
     section("⚠️", "Expires today", expiringToday),
     section("⏳", "Expires tomorrow", tomorrow),
     section("🗑️", "Already expired, log as wasted", expired),

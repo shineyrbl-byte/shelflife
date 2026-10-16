@@ -3,12 +3,21 @@
 // Goes through the running app's API, so it exercises the same validation as the UI.
 //
 // usage: npm run dev   (in another terminal), then
-//        npm run seed [-- --url http://localhost:3000] [-- --force]
-// Refuses to run if there is already stock, unless --force is given.
+//        npm run seed [-- --url http://localhost:3000 --email you@cafe.com --password … --shop "Café Mogra"] [--force]
+// Logs in to that account, or creates the shop if it doesn't exist yet. Without --email/--password it uses
+// a local demo account, which only works on localhost. Refuses to run if the shop already has stock, unless --force.
 
-const i = process.argv.indexOf("--url");
-const BASE = i > -1 ? process.argv[i + 1] : "http://localhost:3000";
+const arg = (name, fallback) => {
+  const i = process.argv.indexOf(`--${name}`);
+  return i > -1 && process.argv[i + 1] ? process.argv[i + 1] : fallback;
+};
+const BASE = arg("url", "http://localhost:3000");
 const FORCE = process.argv.includes("--force");
+const DEMO = { email: "demo@shelflife.local", password: "shelflife-demo-only" };
+const EMAIL = arg("email", DEMO.email);
+const PASSWORD = arg("password", DEMO.password);
+const SHOP = arg("shop", "Café Mogra");
+let cookie = "";
 
 const day = (n) => {
   const d = new Date(Date.now() + n * 86400000);
@@ -41,21 +50,39 @@ const HISTORY = [
 ];
 
 async function api(path, init = {}) {
-  const res = await fetch(BASE + path, { ...init, headers: { "Content-Type": "application/json" } });
+  const res = await fetch(BASE + path, { ...init, headers: { "Content-Type": "application/json", cookie } });
+  const set = res.headers.get("set-cookie");
+  if (set) cookie = set.split(";")[0];
   if (res.status === 204) return null;
   const body = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(`${path}: ${body.error || res.status}`);
   return body;
 }
 
-async function main() {
-  let existing;
+async function logIn() {
+  if (EMAIL === DEMO.email && !/^https?:\/\/(localhost|127\.0\.0\.1)(:|\/|$)/.test(BASE)) {
+    console.error("The demo account is for localhost only. Pass --email and --password for your own account.");
+    process.exit(1);
+  }
   try {
-    existing = await api("/api/stock");
+    await api("/api/auth/login", { method: "POST", body: JSON.stringify({ email: EMAIL, password: PASSWORD }) });
+    console.log(`Logged in as ${EMAIL}.`);
+  } catch (err) {
+    if (!/wrong email or password/i.test(err.message)) throw err;
+    await api("/api/auth/signup", { method: "POST", body: JSON.stringify({ shopName: SHOP, email: EMAIL, password: PASSWORD }) });
+    console.log(`Created shop "${SHOP}" with login ${EMAIL}.`);
+  }
+}
+
+async function main() {
+  try {
+    await fetch(BASE);
   } catch {
     console.error(`Can't reach ${BASE}. Start the app with "npm run dev" first.`);
     process.exit(1);
   }
+  await logIn();
+  const existing = await api("/api/stock");
   if (existing.length && !FORCE) {
     console.error(`There is already stock (${existing.length} batches). Re-run with --force to add the sample data anyway.`);
     process.exit(1);
@@ -88,7 +115,9 @@ async function main() {
     console.log(`Published "${top.title}" at ₹${top.price} and sold 2.`);
   }
 
-  console.log(`\nDone. Open ${BASE} (dashboard), ${BASE}/bundles and ${BASE}/deals`);
+  const me = await api("/api/auth/me");
+  console.log(`\nDone. Log in at ${BASE}/login as ${EMAIL}${EMAIL === DEMO.email ? ` (password: ${PASSWORD})` : ""}.`);
+  console.log(`Customer deals page: ${BASE}/s/${me.shop.slug}`);
 }
 
 main().catch((err) => {

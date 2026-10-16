@@ -1,22 +1,39 @@
 // Adds 4 weeks of past batches with realistic sales and waste, so the Insights page has
 // patterns to find (e.g. croissants over-baked, worst waste on Mondays).
 // Writes to the database directly, because the API only creates stock dated today.
+// Uses the same database as the app: the local file, or Turso if TURSO_DATABASE_URL is set in .env.local.
 //
-// usage: npm run seed:history   (run the app once first, so the tables exist)
+// usage: npm run seed:history [-- --shop <shop link name, e.g. cafe-mogra>] [--force]
+// Without --shop, it uses the only shop (or asks you to pick one).
 
-import { DatabaseSync } from "node:sqlite";
+import { createClient } from "@libsql/client";
 import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import path from "node:path";
 
 const file = path.join(process.cwd(), "data", "shelflife.db");
-if (!existsSync(file)) {
-  console.error('No database yet. Start the app once with "npm run dev" (or run "npm run seed"), then try again.');
+if (!process.env.TURSO_DATABASE_URL && !existsSync(file)) {
+  console.error('No database yet. Run "npm run dev" and "npm run seed" first.');
   process.exit(1);
 }
-const db = new DatabaseSync(file);
-if (db.prepare("SELECT COUNT(*) AS n FROM batches WHERE added_on < date('now', '-1 day')").get().n > 0 && !process.argv.includes("--force")) {
-  console.error("There is already past stock in the database. Re-run with --force to add more history anyway.");
+const db = process.env.TURSO_DATABASE_URL
+  ? createClient({ url: process.env.TURSO_DATABASE_URL, authToken: process.env.TURSO_AUTH_TOKEN })
+  : createClient({ url: `file:${file}` });
+
+const i = process.argv.indexOf("--shop");
+const shops = (await db.execute("SELECT id, slug FROM shops ORDER BY created_at")).rows;
+const shop = i > -1 ? shops.find((s) => s.slug === process.argv[i + 1]) : shops.length === 1 ? shops[0] : null;
+if (!shop) {
+  console.error(
+    shops.length
+      ? `Pick a shop with --shop. Shops: ${shops.map((s) => s.slug).join(", ")}`
+      : 'No shops yet. Run "npm run seed" (or sign up in the app) first.',
+  );
+  process.exit(1);
+}
+const past = await db.execute({ sql: "SELECT COUNT(*) AS n FROM batches WHERE shop_id = ? AND added_on < date('now', '-1 day')", args: [shop.id] });
+if (past.rows[0].n > 0 && !process.argv.includes("--force")) {
+  console.error(`Shop "${shop.slug}" already has past stock. Re-run with --force to add more history anyway.`);
   process.exit(1);
 }
 
@@ -44,13 +61,12 @@ const at = (daysAgo, hour) => {
   return d;
 };
 
-const insertBatch = db.prepare(
-  "INSERT INTO batches (id, name, category, unit, quantity, unit_cost, unit_price, expires_on, added_on) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-);
-const insertEvent = db.prepare("INSERT INTO events (batch_id, outcome, quantity, bundle_id, at) VALUES (?, ?, ?, NULL, ?)");
+// Collected first, then written in one batch (a single round trip, all or nothing).
+const statements = [];
+const insertBatch = { run: (...args) => statements.push({ sql: "INSERT INTO batches (id, shop_id, name, category, unit, quantity, unit_cost, unit_price, expires_on, added_on) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", args: [args[0], shop.id, ...args.slice(1)] }) };
+const insertEvent = { run: (...args) => statements.push({ sql: "INSERT INTO events (batch_id, outcome, quantity, bundle_id, at) VALUES (?, ?, ?, NULL, ?)", args }) };
 
 let batches = 0;
-db.exec("BEGIN");
 for (const item of ITEMS) {
   // Stop early enough that every batch has expired, so its outcome is final.
   for (let ago = DAYS; ago > item.life + 1; ago -= item.every) {
@@ -69,5 +85,5 @@ for (const item of ITEMS) {
     if (left - rescued) insertEvent.run(id, "wasted", left - rescued, expires.toISOString());
   }
 }
-db.exec("COMMIT");
-console.log(`Added ${batches} past batches over ${DAYS} days. Open /insights to see the patterns.`);
+await db.batch(statements, "write");
+console.log(`Added ${batches} past batches over ${DAYS} days to "${shop.slug}". Open /insights to see the patterns.`);

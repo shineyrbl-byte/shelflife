@@ -1,3 +1,4 @@
+import { requireShop } from "@/lib/auth";
 import { z } from "zod";
 import { aiEnabled, isBusyError, writeBundleCopy } from "@/lib/ai";
 import { getBatches } from "@/lib/db";
@@ -11,12 +12,14 @@ const Body = z.object({
 
 /** Writes a name and description for a bundle with AI. Contents and prices come from stock records. */
 export async function POST(req: Request) {
+  const shop = await requireShop();
+  if (shop instanceof Response) return shop;
   if (!aiEnabled()) {
     return Response.json({ error: "AI copy is off. Add a free GEMINI_API_KEY to .env.local to turn it on." }, { status: 501 });
   }
   const body = await readBody(req, Body);
   if (body instanceof Response) return body;
-  const stock = await getBatches(body.items.map((i) => i.batchId));
+  const stock = await getBatches(shop.id, body.items.map((i) => i.batchId));
   const batches = body.items.map((i) => stock.get(i.batchId));
   if (batches.some((b) => !b)) return Response.json({ error: "An item in this bundle no longer exists." }, { status: 400 });
   const found = batches as Batch[];
@@ -26,7 +29,7 @@ export async function POST(req: Request) {
       price: body.price,
       originalPrice: found.reduce((s, b, i) => s + b.unitPrice * body.items[i].quantity, 0),
       expiresOn: found.map((b) => b.expiresOn).sort()[0],
-      shop: process.env.NEXT_PUBLIC_SHOP_NAME,
+      shop: shop.name,
     });
     return Response.json(copy);
   } catch (err) {

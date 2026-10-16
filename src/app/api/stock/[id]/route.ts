@@ -1,3 +1,4 @@
+import { requireShop } from "@/lib/auth";
 import { deleteBatch, getBatch, updateBatch } from "@/lib/db";
 import { notFound, readBody } from "@/lib/http";
 import { BatchInputSchema } from "@/lib/schema";
@@ -6,7 +7,9 @@ type Ctx = { params: Promise<{ id: string }> };
 
 /** Corrects a batch (typo, price, expiry, miscounted quantity). Logged history stays valid. */
 export async function PATCH(req: Request, { params }: Ctx) {
-  const batch = await getBatch((await params).id);
+  const shop = await requireShop();
+  if (shop instanceof Response) return shop;
+  const batch = await getBatch(shop.id, (await params).id);
   if (!batch) return notFound();
   const body = await readBody(req, BatchInputSchema.partial());
   if (body instanceof Response) return body;
@@ -21,14 +24,16 @@ export async function PATCH(req: Request, { params }: Ctx) {
   }
   const parsed = BatchInputSchema.safeParse(next);
   if (!parsed.success) return Response.json({ error: "Invalid values." }, { status: 400 });
-  await updateBatch(batch.id, parsed.data);
-  return Response.json(await getBatch(batch.id));
+  await updateBatch(shop.id, batch.id, parsed.data);
+  return Response.json(await getBatch(shop.id, batch.id));
 }
 
 /** Removes a batch entered by mistake, along with its history. */
 export async function DELETE(_req: Request, { params }: Ctx) {
+  const shop = await requireShop();
+  if (shop instanceof Response) return shop;
   const { id } = await params;
-  if (!(await getBatch(id))) return notFound();
-  await deleteBatch(id);
+  if (!(await getBatch(shop.id, id))) return notFound();
+  await deleteBatch(shop.id, id);
   return new Response(null, { status: 204 });
 }

@@ -1,3 +1,4 @@
+import { requireShop } from "@/lib/auth";
 import { connection } from "next/server";
 import { z } from "zod";
 import { bundlesAvailable } from "@/lib/bundles";
@@ -7,8 +8,10 @@ import type { Batch } from "@/lib/schema";
 
 export async function GET() {
   await connection();
-  const bundles = await listActiveBundles();
-  const stock = await getBatches([...new Set(bundles.flatMap((b) => b.items.map((i) => i.batchId)))]);
+  const shop = await requireShop();
+  if (shop instanceof Response) return shop;
+  const bundles = await listActiveBundles(shop.id);
+  const stock = await getBatches(shop.id, [...new Set(bundles.flatMap((b) => b.items.map((i) => i.batchId)))]);
   // Live availability: how many more of each bundle the remaining stock can make.
   return Response.json(
     bundles.map((b) => ({
@@ -27,16 +30,18 @@ const Body = z.object({
 
 /** Publishes a bundle (usually an accepted suggestion, possibly with edited copy or price). */
 export async function POST(req: Request) {
+  const shop = await requireShop();
+  if (shop instanceof Response) return shop;
   const body = await readBody(req, Body);
   if (body instanceof Response) return body;
-  const stock = await getBatches(body.items.map((i) => i.batchId));
+  const stock = await getBatches(shop.id, body.items.map((i) => i.batchId));
   const found = body.items.map((i) => stock.get(i.batchId));
   if (found.some((b) => !b)) return Response.json({ error: "An item in this bundle no longer exists." }, { status: 400 });
   const batches = found as Batch[];
   // Prices and expiry come from the stock records, not the client.
   const originalPrice = batches.reduce((s, b, i) => s + b.unitPrice * body.items[i].quantity, 0);
   if (body.price > originalPrice) return Response.json({ error: "The bundle price is higher than buying the items separately." }, { status: 400 });
-  const id = await insertBundle({
+  const id = await insertBundle(shop.id, {
     title: body.title,
     description: body.description,
     items: batches.map((b, i) => ({ batchId: b.id, name: b.name, quantity: body.items[i].quantity, unit: b.unit })),
